@@ -9,7 +9,6 @@ RUN npm run build
 # ---- build server (TS → dist) + prod deps (native better-sqlite3) ----
 FROM node:24-slim AS server
 WORKDIR /app/server
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY apps/server/package.json apps/server/package-lock.json* ./
 RUN npm ci
 COPY apps/server/ ./

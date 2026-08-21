@@ -20,7 +20,7 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
@@ -61,6 +61,7 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         env:
+          DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           platforms: ${{ matrix.platform }}
