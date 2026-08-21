@@ -1,0 +1,45 @@
+{
+  "name": "@apione/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "ApiOne Studio backend shell — vault storage (file=truth) + version table + optimistic concurrency",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json && cp -R src/ai dist/ai && node scripts/bundle-scalar.mjs",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "test": "node --import tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/jwt": "^10.1.0",
+    "@fastify/static": "^10.1.2",
+    "@fastify/swagger": "^9.8.1",
+    "@redocly/openapi-core": "^2.35.1",
+    "argon2": "^0.44.0",
+    "better-sqlite3": "^12.11.1",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.8.5",
+    "quickjs-emscripten": "^0.32.0",
+    "swagger2openapi": "^7.0.8",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@scalar/api-reference": "1.62.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0"
+  }
+}

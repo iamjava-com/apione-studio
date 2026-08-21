@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+coverage
+test-results
+playwright-report
+**/drizzle/**
+apps/web/public
+package-lock.json
+*.md

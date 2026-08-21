@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/hanken-grotesk';
+@import '@fontsource-variable/jetbrains-mono';
+
+/* "Graphite & Brass" — a precise instrument for API contracts.
+   Color is functional (HTTP method / status), brass is the single brand mark. */
+@theme {
+  --color-bg: #0e1116;
+  --color-surface: #141921;
+  --color-raised: #1a2029;
+  --color-border: #242b36;
+  --color-border-strong: #333d4b;
+  --color-text: #e7eaf0;
+  --color-muted: #98a1b0;
+  --color-faint: #66707e;
+
+  --color-brand: #e8b04b;
+  --color-brand-bright: #f2c063;
+  --color-brand-dim: #b9863a;
+
+  --color-brand-solid: #d9a244;
+  --color-brand-solid-hover: #e8b04b;
+  --color-on-brand: #17120a;
+
+  /* One brass in both themes, unlike --color-brand, which darkens in light mode for text. */
+  --color-logo: #e8b04b;
+
+  --color-get: #4fa3e3;
+  --color-post: #54b981;
+  --color-put: #e08c3c;
+  --color-patch: #46b6ad;
+  --color-delete: #e2574f;
+  --color-danger: #e2574f;
+
+  /* Latin face first; CJK system faces follow so CJK glyphs fall back to a good font
+     on each OS (zero extra bytes, consistent across platforms). */
+  --font-sans:
+    'Hanken Grotesk Variable', ui-sans-serif, system-ui, 'PingFang SC', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
+    'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', sans-serif;
+  --font-mono:
+    'JetBrains Mono Variable', ui-monospace, 'SF Mono', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei',
+    'Noto Sans CJK SC', monospace;
+}
+
+/* Light theme: override the same tokens (higher specificity than :root so it wins
+   regardless of source order). Toggling html[data-theme] flips every utility. */
+html[data-theme='light'] {
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-raised: #eef1f5;
+  --color-border: #e3e7ee;
+  --color-border-strong: #cdd4de;
+  --color-text: #1a1f27;
+  --color-muted: #5a6473;
+  --color-faint: #97a0ae;
+  --color-brand: #b9863a;
+  --color-brand-bright: #cf9a45;
+  --color-get: #2a82c9;
+  --color-post: #2f9e63;
+  --color-put: #c9732a;
+  --color-patch: #2f8e86;
+  --color-delete: #cf3f37;
+  --color-danger: #cf3f37;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    /* paint the token bg on <html> too, so content scrolled past the viewport
+       doesn't reveal the white canvas */
+    background: var(--color-bg);
+  }
+  body {
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* brass focus ring across interactive elements */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
+  }
+  /* Thin, auto-hiding scrollbars in place of the chunky native ones (Firefox + WebKit).
+     The thumb is transparent at rest and only appears while hovering the scroll area; the
+     transparent border + content-box clip makes the painted pill read as a slim ~4px. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent; /* Firefox: hidden at rest */
+  }
+  *:hover {
+    scrollbar-color: var(--color-border-strong) transparent; /* Firefox: reveal on hover */
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: transparent; /* hidden at rest */
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  :hover::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong); /* reveal while hovering the scroll area */
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-faint); /* brighter when hovering the thumb itself */
+    background-clip: content-box;
+  }
+  /* ⌘K belongs to our command palette app-wide (see CommandPalette), so Scalar's
+     docs-search hotkey is pre-empted — hide its now-dead ⌘K hint to not mislead. */
+  .scalar-docs [role='search'] span:has(kbd) {
+    display: none;
+  }
+}

@@ -1,0 +1,1 @@
+DROP TABLE `mock_state`;

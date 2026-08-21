@@ -1,0 +1,104 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1782464247119,
+      "tag": "0000_outgoing_terrax",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1782886008023,
+      "tag": "0001_furry_colonel_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783563171742,
+      "tag": "0002_organic_imperial_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783650891711,
+      "tag": "0003_sparkling_emma_frost",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1783924676000,
+      "tag": "0004_open_reptil",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785118334226,
+      "tag": "0005_bent_cargill",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785131466130,
+      "tag": "0006_gray_ultragirl",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785134195338,
+      "tag": "0007_omniscient_chimera",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1785134195339,
+      "tag": "0008_mock_configs_by_op_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1785134195340,
+      "tag": "0009_mock_configs_drop_updated_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785478880497,
+      "tag": "0010_project_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1785727918555,
+      "tag": "0011_aromatic_shooting_star",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1785814370422,
+      "tag": "0012_wandering_stephen_strange",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1786611948649,
+      "tag": "0013_smooth_champions",
+      "breakpoints": true
+    }
+  ]
+}

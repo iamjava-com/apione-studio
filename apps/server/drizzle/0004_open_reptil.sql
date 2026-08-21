@@ -1,0 +1,1 @@
+ALTER TABLE `versions` ADD `source_version` integer;

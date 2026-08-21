@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call: # release.yml gates on this before it publishes
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # Breaking-change engine. Optional — the diff tests degrade gracefully without it.
+      - name: Install oasdiff
+        run: |
+          curl -fsSL "https://github.com/oasdiff/oasdiff/releases/download/v1.21.0/oasdiff_1.21.0_linux_amd64.tar.gz" -o /tmp/oasdiff.tar.gz \
+            && sudo tar -xzf /tmp/oasdiff.tar.gz -C /usr/local/bin oasdiff \
+            && oasdiff --version || echo "oasdiff install failed — tests degrade gracefully"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/server
+          npm ci --prefix apps/web
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      # Exactly what a developer runs locally: format + typecheck + unit tests + build, then e2e.
+      - name: Verify
+        run: npm run verify
+
+  # Single arch; release.yml covers the others.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          load: true
+          tags: apione-studio:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: The image has to answer
+        run: |
+          docker run -d --name ci -p 4100:4100 apione-studio:ci
+          for _ in $(seq 30); do curl -sf localhost:4100/health && break; sleep 1; done
+          curl -sf localhost:4100/health
+          curl -sf localhost:4100/ | grep -q '<!doctype html>'

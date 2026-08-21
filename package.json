@@ -1,0 +1,30 @@
+{
+  "name": "apione-studio",
+  "private": true,
+  "version": "0.0.1",
+  "description": "OpenAPI-first API studio — file-as-truth, self-hosted.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "setup": "npm --prefix apps/server install && npm --prefix apps/web install",
+    "dev": "concurrently -n server,web -c blue,magenta \"npm --prefix apps/server run dev\" \"npm --prefix apps/web run dev\"",
+    "check": "npm run format:check && npm run check:server && npm run check:web",
+    "check:server": "npm --prefix apps/server run typecheck && npm --prefix apps/server test && npm --prefix apps/server run build",
+    "check:web": "npm --prefix apps/web run lint && npm --prefix apps/web run build",
+    "lint:web": "npm --prefix apps/web run lint",
+    "lint:fix:web": "npm --prefix apps/web run lint:fix",
+    "verify": "npm run check && npm run e2e",
+    "build": "npm --prefix apps/web run build && npm --prefix apps/server run build",
+    "start": "node apps/server/dist/index.js",
+    "test:server": "npm --prefix apps/server test",
+    "e2e": "npm --prefix apps/web run e2e",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,mjs,json,css}\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,mjs,json,css}\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.9.4"
+  }
+}

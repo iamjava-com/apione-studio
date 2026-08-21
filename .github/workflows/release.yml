@@ -1,0 +1,150 @@
+name: Release
+
+# Pushing a version tag is the whole trigger: it builds the image for both architectures, publishes
+# it to GHCR under that version, and opens the GitHub Release that carries the notes.
+on:
+  push:
+    tags: ['v*']
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  # Each runner pushes a nameless digest; `merge` binds them to the tags.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    needs: verify
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The tag and the package version have to agree
+        run: |
+          pkg=$(node -p "require('./apps/server/package.json').version")
+          [ "v$pkg" = "$GITHUB_REF_NAME" ] || {
+            echo "tag $GITHUB_REF_NAME does not match package version $pkg" >&2
+            exit 1
+          }
+
+      - name: Name the platform for the artifact
+        run: echo "PLATFORM=${platform//\//-}" >> "$GITHUB_ENV"
+        env:
+          platform: ${{ matrix.platform }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Labels only — the tags are applied once, on the manifest list.
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+
+      - id: build
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # The labels' `org.opencontainers.image.source` is what links the package to this repo.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+
+      - name: Hand the digest to the merge job
+        run: |
+          mkdir -p /tmp/digests
+          digest='${{ steps.build.outputs.digest }}'
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ env.PLATFORM }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # The tags exist only here: one manifest list over both digests, so `docker pull` picks the
+  # architecture it lands on.
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # cutting the release
+      packages: write
+    steps:
+      - uses: actions/checkout@v7 # `gh` reads the repository from the checkout
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          # `latest=auto` leaves a pre-release tag (v0.2.0-rc1) off `latest`.
+          flavor: latest=auto
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Bind the digests to the tags
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+
+      - name: Show what was published
+        run: docker buildx imagetools inspect '${{ env.IMAGE }}:${{ steps.meta.outputs.version }}'
+
+      - name: Cut the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$TAG" --jq .body > notes.md
+          cat >> notes.md <<EOF
+
+          ## Docker
+
+          \`\`\`bash
+          docker run -d -p 4100:4100 -v apione-data:/data $IMAGE:$VERSION
+          \`\`\`
+          EOF
+          # A hyphen in the tag marks a pre-release.
+          case "$TAG" in
+            *-*) gh release create "$TAG" --title "$TAG" --notes-file notes.md --prerelease ;;
+            *) gh release create "$TAG" --title "$TAG" --notes-file notes.md ;;
+          esac

@@ -1,0 +1,13 @@
+# Self-hosted ApiOne Studio — one container, SQLite index in a volume (no DB service).
+services:
+  apione:
+    build: .
+    image: apione-studio
+    ports:
+      - '4100:4100'
+    volumes:
+      - apione-data:/data
+    restart: unless-stopped
+
+volumes:
+  apione-data:
