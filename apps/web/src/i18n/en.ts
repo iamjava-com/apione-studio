@@ -56,6 +56,8 @@ export const en = {
   viewCrashedTitle: 'This view stopped working',
   viewCrashedHint:
     'Usually the document has a shape the editor did not expect. Your unsaved changes are still here — try again, or switch to the YAML tab to look at the file directly.',
+  newBuildTitle: 'A new version is ready',
+  newBuildHint: 'Reload to apply.',
   viewDiff: 'View diff',
   reset: 'Reset',
   resetConfirm: 'Discard unsaved changes and go back to the last saved version?',

@@ -5,9 +5,12 @@ import './styles.css';
 import { App } from './App';
 import { ThemeProvider, getInitialTheme } from './theme';
 import { ConfirmProvider } from './components/ConfirmProvider';
+import { watchForStaleBuild } from './lib/stale-build';
 
 // Apply the persisted theme before first paint to avoid a flash.
 document.documentElement.dataset.theme = getInitialTheme();
+
+watchForStaleBuild();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('#root not found');

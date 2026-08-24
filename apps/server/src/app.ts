@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
@@ -180,7 +181,17 @@ export function buildApp(opts: { logger?: boolean } = {}): FastifyInstance {
 
   // Single-container mode: serve the built web SPA + fallback to index.html.
   if (config.webDist) {
-    app.register(fastifyStatic, { root: config.webDist, prefix: '/', decorateReply: true });
+    app.register(fastifyStatic, {
+      root: config.webDist,
+      prefix: '/',
+      decorateReply: true,
+      cacheControl: false, // setHeaders below is the only source
+      setHeaders(reply, pathname) {
+        // assets/ is content-hashed; index.html names them, so it has to be revalidated.
+        const hashed = pathname.includes(`${path.sep}assets${path.sep}`);
+        reply.header('cache-control', hashed ? 'public, max-age=31536000, immutable' : 'no-cache');
+      },
+    });
     app.setNotFoundHandler((req, reply) => {
       // Same reason as the auth gate above: an absolute-form target would make every prefix here
       // read false and hand back index.html for an unmatched /api call.

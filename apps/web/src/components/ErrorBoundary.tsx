@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
+import { sawStaleBuild } from '../lib/stale-build';
 
 /**
  * Keeps one bad document from taking the window with it.
@@ -40,16 +41,20 @@ export class ErrorBoundary extends Component<{ children: ReactNode; onReset?: ()
 
 function Fallback({ error, onReset }: { error: Error; onReset: () => void }) {
   const { t } = useTranslation();
+  // Re-mounting would ask for the same missing chunk; only a reload can fix it.
+  const stale = sawStaleBuild();
   return (
     <div className="flex h-full items-center justify-center p-8 text-center">
       <div className="max-w-md space-y-3">
-        <p className="text-[16px] text-text">{t('viewCrashedTitle')}</p>
-        <p className="text-[14px] text-muted">{t('viewCrashedHint')}</p>
-        <pre className="max-h-40 overflow-auto rounded border border-line bg-surface p-2 text-left text-[12px] text-muted">
-          {error.message}
-        </pre>
-        <Button size="sm" onClick={onReset}>
-          {t('retry')}
+        <p className="text-[16px] text-text">{t(stale ? 'newBuildTitle' : 'viewCrashedTitle')}</p>
+        <p className="text-[14px] text-muted">{t(stale ? 'newBuildHint' : 'viewCrashedHint')}</p>
+        {!stale && (
+          <pre className="max-h-40 overflow-auto rounded border border-line bg-surface p-2 text-left text-[12px] text-muted">
+            {error.message}
+          </pre>
+        )}
+        <Button size="sm" onClick={stale ? () => window.location.reload() : onReset}>
+          {t(stale ? 'reload' : 'retry')}
         </Button>
       </div>
     </div>

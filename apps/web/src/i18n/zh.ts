@@ -57,6 +57,8 @@ export const zh: Record<keyof TranslationKeys, string> = {
   retry: '重试',
   viewCrashedTitle: '这个视图无法继续显示',
   viewCrashedHint: '通常是文档的结构超出了编辑器的预期。您未保存的修改还在——可以重试，或切到 YAML 标签直接查看文件。',
+  newBuildTitle: '新版本已就绪',
+  newBuildHint: '刷新后生效。',
   viewDiff: '查看差异',
   reset: '重置',
   resetConfirm: '放弃未保存的更改，回到上次保存的版本？',
