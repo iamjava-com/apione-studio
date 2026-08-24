@@ -37,7 +37,7 @@ history, a mock server and user management on top.
 ### Docker
 
 ```bash
-docker compose up --build
+docker run -d -p 4100:4100 -v apione-data:/data ghcr.io/iamjava-com/apione-studio
 ```
 
 ### Node
