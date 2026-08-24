@@ -23,12 +23,12 @@ git rev-parse -q --verify "refs/tags/v$version" >/dev/null && {
   exit 1
 }
 
+npm run verify
+
 # `npm version` rather than an edit in place: it carries the number into package-lock.json too.
 for pkg in . apps/server apps/web; do
   npm --prefix "$pkg" version "$version" --no-git-tag-version >/dev/null
 done
-
-npm run verify
 
 git commit -aqm "chore(release): v$version"
 git tag "v$version"
