@@ -118,3 +118,27 @@ test('the released-only export leaves the unreleased endpoints out', async ({ pa
   expect(yaml).toContain('/orders');
   expect(yaml).not.toContain('/drafts');
 });
+
+// A stage read is fired whenever the selection moves, so one is often still in flight when the
+// picker is used. Its answer predates the pick and must not be allowed to replace it.
+test('a stage set while a stage read is in flight survives it', async ({ page }) => {
+  await projectWithTwoEndpoints(page);
+
+  // Answered by the server now, delivered late: exactly a read whose answer predates the pick.
+  await page.route('**/api/projects/*/operations/status', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const res = await route.fetch();
+    const body = await res.text();
+    await new Promise((r) => setTimeout(r, 2000));
+    return route.fulfill({ response: res, body });
+  });
+
+  // Selecting the endpoint starts the read; the pick lands while it is still open.
+  await page.getByLabel('open-op-get-/orders').click();
+  await page.getByLabel('op-stage').selectOption('released');
+  const dot = page.getByLabel('open-op-get-/orders').locator('[aria-label="stage-released"]');
+  await expect(dot).toBeVisible();
+
+  await page.waitForTimeout(3000); // past the held read
+  await expect(dot).toBeVisible();
+});

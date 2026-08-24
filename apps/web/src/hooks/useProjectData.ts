@@ -37,10 +37,10 @@ export function useProjectData(projectId: string): ProjectData {
   const [mockCatalog, setMockCatalog] = useState<MockCatalog | null>(null);
   const [mockDrafts, setMockDrafts] = useState<Record<string, string>>({});
 
-  const latestOnly = useLatestOnly();
+  const latest = useLatestOnly();
 
   const reloadMockCatalog = useCallback(() => {
-    latestOnly(
+    latest.read(
       'mock',
       api.mockCatalog(projectId),
       (c) => {
@@ -51,14 +51,14 @@ export function useProjectData(projectId: string): ProjectData {
       },
       () => setMockCatalog(null), // no mock:read, or the spec won't bundle — nothing to reconcile
     );
-  }, [projectId, latestOnly]);
+  }, [projectId, latest]);
 
   const refresh = useCallback(() => {
     reloadMockCatalog();
-    latestOnly('files', api.listFiles(projectId), setFiles, () => setFiles([]));
-    latestOnly('graph', api.graph(projectId), setGraph, () => setGraph(null));
-    latestOnly('lint', api.lint(projectId), setLint, () => setLint(null));
-    latestOnly(
+    latest.read('files', api.listFiles(projectId), setFiles, () => setFiles([]));
+    latest.read('graph', api.graph(projectId), setGraph, () => setGraph(null));
+    latest.read('lint', api.lint(projectId), setLint, () => setLint(null));
+    latest.read(
       'project',
       api.getProject(projectId),
       (p) => {
@@ -67,7 +67,7 @@ export function useProjectData(projectId: string): ProjectData {
       },
       () => setRoleLoaded(true),
     );
-  }, [projectId, reloadMockCatalog, latestOnly]);
+  }, [projectId, reloadMockCatalog, latest]);
   useEffect(refresh, [refresh]);
 
   return {

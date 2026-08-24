@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api, DEFAULT_STAGE, type Stage } from '../api';
 import { useRevisit } from '../hooks/useRevisit';
 import { useLatestOnly } from '../hooks/useLatestOnly';
@@ -27,14 +27,9 @@ const StagesContext = createContext<StageStore | null>(null);
 export function OperationStagesProvider({ projectId, children }: { projectId: string; children: React.ReactNode }) {
   const [stages, setStages] = useState<Map<string, Stage>>(new Map());
   const [loaded, setLoaded] = useState(false);
-  // A read that lands between the optimistic update and the write it belongs to would show the old
-  // stage back again, so a write in flight holds the refresh off.
-  const writing = useRef(0);
-
-  const latestOnly = useLatestOnly();
+  const latest = useLatestOnly();
   const load = useCallback(() => {
-    if (writing.current > 0) return;
-    latestOnly(
+    latest.read(
       'stages',
       api.operationStatuses(projectId),
       ({ statuses }) => {
@@ -45,7 +40,7 @@ export function OperationStagesProvider({ projectId, children }: { projectId: st
       // default", which is what an unreachable stage list is worth.
       () => setLoaded(true),
     );
-  }, [projectId, latestOnly]);
+  }, [projectId, latest]);
 
   useEffect(() => {
     setLoaded(false);
@@ -63,9 +58,8 @@ export function OperationStagesProvider({ projectId, children }: { projectId: st
     async (opId: string, stage: Stage) => {
       const previous = stages.get(opId);
       setStages((m) => new Map(m).set(opId, stage));
-      writing.current += 1;
       try {
-        await api.setOperationStage(projectId, opId, stage);
+        await latest.write('stages', () => api.setOperationStage(projectId, opId, stage));
       } catch (e) {
         setStages((m) => {
           const next = new Map(m);
@@ -74,11 +68,9 @@ export function OperationStagesProvider({ projectId, children }: { projectId: st
           return next;
         });
         throw e;
-      } finally {
-        writing.current -= 1;
       }
     },
-    [projectId, stages],
+    [projectId, stages, latest],
   );
 
   return <StagesContext.Provider value={{ stageOf, setStage, loaded }}>{children}</StagesContext.Provider>;

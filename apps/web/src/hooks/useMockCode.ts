@@ -76,10 +76,10 @@ export function useMockCode({
     current.current = { saving, key, saved, drafts };
   }, [saving, key, saved, drafts]);
 
-  const latestOnly = useLatestOnly();
+  const latest = useLatestOnly();
   const loadCode = useCallback(
     (k: string) => {
-      latestOnly(
+      latest.read(
         k,
         api.readMockCode(projectId, k),
         (c) => setSaved((s) => ({ ...s, [k]: { content: c.content, version: c.version } })),
@@ -88,7 +88,7 @@ export function useMockCode({
         (err) => setError(errorText(err)),
       );
     },
-    [projectId, latestOnly],
+    [projectId, latest],
   );
 
   // Fetch a given operation's saved code once; drafts layer on top of it.
@@ -151,7 +151,7 @@ export function useMockCode({
     setError(null);
     setConflict(false);
     try {
-      const res = await api.writeMockCode(projectId, key, code, saved[key]?.version ?? 0);
+      const res = await latest.write(key, () => api.writeMockCode(projectId, key, code, saved[key]?.version ?? 0));
       setSaved((s) => ({ ...s, [key]: { content: res.content, version: res.version } }));
       setDrafts((d) => dropDraft(d, key)); // saved — the draft is no longer a pending edit
       reloadCatalog();
@@ -188,7 +188,7 @@ export function useMockCode({
     // and so the editor opens clean, rather than pre-dirtied by a template the user never typed.
     if (next === 'scripted' && !savedCode.trim() && drafts[key] === undefined) {
       try {
-        const res = await api.writeMockCode(projectId, key, STARTER, 0);
+        const res = await latest.write(key, () => api.writeMockCode(projectId, key, STARTER, 0));
         setSaved((s) => ({ ...s, [key]: { content: res.content, version: res.version } }));
       } catch (e) {
         report(e);

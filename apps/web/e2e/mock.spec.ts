@@ -187,3 +187,40 @@ test('the mock view stops reading once it has an answer', async ({ page }) => {
   // Selecting the endpoint costs its code plus one catalog re-read; nothing after that.
   expect(reads).toBeLessThanOrEqual(4);
 });
+
+// The stages race, on code: a revisit read answered before a save must not put the replaced code
+// and version back over what the save returned.
+test('code saved while a code read is in flight survives it', async ({ page }) => {
+  await authenticate(page);
+  await createProject(page, `Mock write race ${Date.now()}`);
+  await addEndpoint(page, 'get', '/orders');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByLabel('unsaved')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Mock', exact: true }).click();
+  await page.getByText('Say hello').click();
+  await page.getByRole('button', { name: 'Scripted', exact: true }).click();
+  await expect(page.locator('.monaco-editor').first()).toContainText('MockResponse');
+
+  // Answered by the server now, delivered late — a read whose answer predates the save.
+  await page.route('**/mock/code?**', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const res = await route.fetch();
+    const body = await res.text();
+    await new Promise((r) => setTimeout(r, 2000));
+    return route.fulfill({ response: res, body });
+  });
+
+  // Leaving and coming back starts the revisit read; the edit and save land under it.
+  await page.getByTitle('/orders', { exact: true }).click();
+  await page.getByText('Say hello').click();
+  await page.locator('.monaco-editor').first().click();
+  // One atomic insert: per-key typing races the re-renders of the catalog read this test holds open.
+  await page.keyboard.insertText('// mine ');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByLabel('unsaved')).toHaveCount(0);
+
+  await page.waitForTimeout(3000); // past the held read
+  await expect(page.locator('.monaco-editor').first()).toContainText('mine');
+  await expect(page.getByLabel('mock-conflict')).toHaveCount(0);
+});
