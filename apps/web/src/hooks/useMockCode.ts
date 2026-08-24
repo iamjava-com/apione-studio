@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, ApiError, type MockCatalog, type MockMode } from '../api';
 import { errorText } from '../lib/errors';
@@ -69,6 +69,13 @@ export function useMockCode({
     setSaved((s) => keepOnly(s, live));
   }, [catalog]);
 
+  // What `revisit` reads, kept out of its dependencies. Written above `useRevisit` so the commit
+  // that fires a revisit has already put this render's values in place.
+  const current = useRef({ saving, key, saved, drafts });
+  useEffect(() => {
+    current.current = { saving, key, saved, drafts };
+  }, [saving, key, saved, drafts]);
+
   const latestOnly = useLatestOnly();
   const loadCode = useCallback(
     (k: string) => {
@@ -101,13 +108,18 @@ export function useMockCode({
    * Never under an unsaved draft. That draft was written against the version in `saved`, and taking
    * a newer one on would turn the 409 it has coming into a silent overwrite of the other author's
    * code — a sidecar has no structure to merge on.
+   *
+   * Read through `current`, not the closure: `useRevisit` fires whenever this callback changes, and
+   * a read replaces `saved` — closing over it would make every read schedule the next one. `drafts`
+   * changes on every keystroke.
    */
   const revisit = useCallback(() => {
+    const { saving, key, saved, drafts } = current.current;
     if (saving) return;
     reloadCatalog();
     // Uncached is the effect above's job; asking here too would only fetch it twice.
     if (key && saved[key] && drafts[key] === undefined) loadCode(key);
-  }, [saving, reloadCatalog, key, saved, drafts, loadCode]);
+  }, [reloadCatalog, loadCode]);
   useRevisit(revisit);
 
   const savedCode = key ? (saved[key]?.content ?? '') : '';

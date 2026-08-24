@@ -163,3 +163,27 @@ test('deleting an operation drops its mock draft, so leaving asks nothing', asyn
   await expect(page.getByLabel('confirm-ok')).toHaveCount(0);
   await expect(page.getByLabel('New project', { exact: true })).toBeVisible();
 });
+
+// Every revisit re-reads the mock, and a read replaces the state the revisit callback closes over.
+// If that callback is rebuilt from the state it just changed, the two feed each other and the view
+// reads forever.
+test('the mock view stops reading once it has an answer', async ({ page }) => {
+  await authenticate(page);
+  await createProject(page, `Mock idle ${Date.now()}`);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByLabel('unsaved')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Mock', exact: true }).click();
+
+  let reads = 0;
+  page.on('request', (r) => {
+    if (/^\/api\/projects\/[^/]+\/mock/.test(new URL(r.url()).pathname)) reads += 1;
+  });
+
+  await page.getByText('Say hello').click();
+  await expect(page.getByText('Auto mock is serving this endpoint')).toBeVisible();
+  await page.waitForTimeout(2000);
+
+  // Selecting the endpoint costs its code plus one catalog re-read; nothing after that.
+  expect(reads).toBeLessThanOrEqual(4);
+});
