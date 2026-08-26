@@ -129,7 +129,7 @@ export function SpecEditor({
       <div className="min-h-0 flex-1">
         {view === 'yaml' ? (
           <Suspense fallback={<div className="h-full" />}>
-            <YamlView file={file} />
+            <YamlView file={file} docRevision={docRevision} />
           </Suspense>
         ) : (
           <PendingEditsProvider onChange={(d) => setPendingEdits((n) => Math.max(0, n + d))}>

@@ -8,6 +8,7 @@ import { useSpecFile } from '../hooks/useSpecFile';
 import { useProjectData } from '../hooks/useProjectData';
 import { useRevisit } from '../hooks/useRevisit';
 import { useDebounced } from '../hooks/useDebounced';
+import { useParsedDoc } from '../hooks/useParsedDoc';
 import { cn } from '../lib/utils';
 import { errorText } from '../lib/errors';
 import { SpecEditor } from './SpecEditor';
@@ -73,14 +74,7 @@ export function ProjectView({
   const file = useSpecFile(project.id, activePath, onSaved, project.name);
   // Everything derived from `doc` (outline, palette entries) is too expensive per keystroke, so it
   // trails the editor by a beat. The editor and the save path read file.content directly.
-  const debouncedContent = useDebounced(file.content, 200);
-  const doc = useMemo<Doc | null>(() => {
-    try {
-      return (YAML.parse(debouncedContent) as Doc) ?? {};
-    } catch {
-      return null;
-    }
-  }, [debouncedContent]);
+  const doc = useParsedDoc<Doc>(useDebounced(file.content, 200));
 
   useRevisit(file.sync);
 

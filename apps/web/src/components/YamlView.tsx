@@ -22,10 +22,28 @@ function keyOffset(text: string, target: RevealTarget): number | null {
   }
 }
 
-/** Raw YAML view — Monaco bound to the shared spec-file content (the escape hatch). */
-export function YamlView({ file }: { file: SpecFile }) {
+/**
+ * Raw YAML view — Monaco over the shared spec-file content (the escape hatch).
+ *
+ * Monaco is uncontrolled: a controlled `value` is reconciled in a passive effect, and a keystroke
+ * that lands between commit and that effect gets overwritten (cursor to the end, text lost) — on a
+ * large document, where renders are slow, that is every fast burst. Outside text arrives only via
+ * `file.syncRev` (load / reset / restore / rebase) and `docRevision` (outline edits).
+ */
+export function YamlView({ file, docRevision }: { file: SpecFile; docRevision?: number }) {
   const { theme } = useTheme();
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+
+  useEffect(() => {
+    const ed = editorRef.current;
+    const model = ed?.getModel();
+    if (!ed || !model || model.getValue() === file.content) return;
+    const pos = ed.getPosition();
+    ed.executeEdits('', [{ range: model.getFullModelRange(), text: file.content }]);
+    ed.pushUndoStop();
+    if (pos) ed.setPosition(model.validatePosition(pos));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- content is read, never a trigger
+  }, [file.syncRev, docRevision]);
 
   // Navigator clicks fire "apione-reveal"; jump Monaco to that key's line.
   useEffect(() => {
@@ -49,7 +67,7 @@ export function YamlView({ file }: { file: SpecFile }) {
       height="100%"
       theme={`apione-${theme}`}
       language="yaml"
-      value={file.content}
+      defaultValue={file.content}
       onChange={(v) => file.setContent(v ?? '')}
       onMount={(ed) => (editorRef.current = ed)}
       options={{
