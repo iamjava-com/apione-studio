@@ -1,13 +1,17 @@
 name: Release
 
-# Pushing a version tag is the whole trigger: it builds the image for both architectures, publishes
-# it to GHCR under that version, and opens the GitHub Release that carries the notes.
+# Called by release-please.yml once it has tagged a release: builds the image for both
+# architectures, publishes it to GHCR under the version, and puts the Docker line on the Release.
 on:
-  push:
-    tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
+  TAG: ${{ inputs.tag }}
 
 jobs:
   verify:
@@ -34,8 +38,8 @@ jobs:
       - name: The tag and the package version have to agree
         run: |
           pkg=$(node -p "require('./apps/server/package.json').version")
-          [ "v$pkg" = "$GITHUB_REF_NAME" ] || {
-            echo "tag $GITHUB_REF_NAME does not match package version $pkg" >&2
+          [ "v$pkg" = "$TAG" ] || {
+            echo "tag $TAG does not match package version $pkg" >&2
             exit 1
           }
 
@@ -113,11 +117,12 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE }}
-          # `latest=auto` leaves a pre-release tag (v0.2.0-rc1) off `latest`.
+          # `latest=auto` leaves a pre-release tag (v0.2.0-rc1) off `latest`. `value` because the
+          # ref here is main, not the tag.
           flavor: latest=auto
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
 
       - name: Bind the digests to the tags
         working-directory: /tmp/digests
@@ -129,13 +134,12 @@ jobs:
       - name: Show what was published
         run: docker buildx imagetools inspect '${{ env.IMAGE }}:${{ steps.meta.outputs.version }}'
 
-      - name: Cut the release
+      - name: Put the Docker line on the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$TAG" --jq .body > notes.md
+          gh release view "$TAG" --json body --jq .body > notes.md
           cat >> notes.md <<EOF
 
           ## Docker
@@ -144,8 +148,4 @@ jobs:
           docker run -d -p 4100:4100 -v apione-data:/data $IMAGE:$VERSION
           \`\`\`
           EOF
-          # A hyphen in the tag marks a pre-release.
-          case "$TAG" in
-            *-*) gh release create "$TAG" --title "$TAG" --notes-file notes.md --prerelease ;;
-            *) gh release create "$TAG" --title "$TAG" --notes-file notes.md ;;
-          esac
+          gh release edit "$TAG" --notes-file notes.md

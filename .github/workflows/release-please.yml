@@ -1,0 +1,37 @@
+name: Release Please
+
+# Every push to main updates one open "release" PR: version bumps in the three packages plus the
+# CHANGELOG entry, both derived from the conventional-commit subjects since the last tag. Merging
+# that PR tags the version and creates the GitHub Release; `publish` then builds the image.
+#
+# `publish` is chained here rather than triggered by the tag: a tag pushed with GITHUB_TOKEN
+# does not fire other workflows.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag }}
+    permissions:
+      contents: write
+      packages: write
