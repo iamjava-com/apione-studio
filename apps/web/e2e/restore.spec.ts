@@ -32,3 +32,56 @@ test('restoring v1 brings its content back as a new version on top', async ({ pa
   await expect(page.getByLabel('Title')).toHaveValue(name);
   await expect(page.getByLabel('unsaved')).toBeHidden();
 });
+
+// Opening the inspect panel must not remount the workspace (that re-parses the spec and freezes the
+// tab on a large one). The YAML view is editor state, so it survives only if the editor did.
+test('opening history leaves the editor as it was', async ({ page }) => {
+  await authenticate(page);
+  await createProject(page, `History mount ${Date.now()}`);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(msg('saved', { version: 1 }))).toBeVisible();
+
+  await page.getByRole('button', { name: 'YAML', exact: true }).click();
+  await expect(page.locator('.monaco-editor').first()).toBeVisible();
+
+  await page.getByLabel('tool-history').click();
+  await expect(page.getByLabel('compare-base')).toBeVisible();
+  await expect(page.locator('.monaco-editor').first()).toBeVisible();
+
+  await page.getByLabel('close-tool').click();
+  await expect(page.getByLabel('compare-base')).toBeHidden();
+  await expect(page.locator('.monaco-editor').first()).toBeVisible();
+});
+
+// The panel cannot be dragged shut: that would close the tool mid-drag, and dragging back would
+// reopen it empty. The divider stops at the panel's minimum.
+test('the history panel cannot be dragged shut', async ({ page }) => {
+  await authenticate(page);
+  await createProject(page, `History drag ${Date.now()}`);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(msg('saved', { version: 1 }))).toBeVisible();
+  await page.getByLabel('tool-history').click();
+  await expect(page.getByLabel('compare-base')).toBeVisible();
+
+  const panel = page.locator('[data-panel]').last();
+  const sep = page.locator('[data-separator]').last();
+  const box = (await sep.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 2000, box.y + box.height / 2, { steps: 10 });
+  // Still down: drag back a little — this is where a collapsible panel would reopen empty.
+  await page.mouse.move(box.x + 1900, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  await expect(page.getByLabel('compare-base')).toBeVisible();
+  const group = (await page.locator('[data-group]').first().boundingBox())!;
+  expect((await panel.boundingBox())!.width).toBeGreaterThanOrEqual(group.width * 0.16 - 1);
+
+  // Closing still takes it to zero width, and reopening brings it back.
+  await page.getByLabel('close-tool').click();
+  await expect(page.getByLabel('compare-base')).toBeHidden();
+  expect((await panel.boundingBox())!.width).toBeLessThan(1);
+  await page.getByLabel('tool-history').click();
+  await expect(page.getByLabel('compare-base')).toBeVisible();
+  expect((await panel.boundingBox())!.width).toBeGreaterThanOrEqual(group.width * 0.16 - 1);
+});

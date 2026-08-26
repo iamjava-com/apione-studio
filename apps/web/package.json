@@ -28,6 +28,7 @@
     "@radix-ui/react-tabs": "^1.1.15",
     "@scalar/api-reference-react": "^0.9.49",
     "@tailwindcss/vite": "^4.3.2",
+    "@tanstack/react-virtual": "^3.14.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff": "^9.0.0",

@@ -1,6 +1,6 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Group, Panel } from 'react-resizable-panels';
+import { Group, Panel, type PanelImperativeHandle } from 'react-resizable-panels';
 import YAML from 'yaml';
 import { Clock, Settings, X } from 'lucide-react';
 import { api, type Permission, type Project } from '../api';
@@ -31,6 +31,7 @@ const ScalarDocs = lazy(() => import('./ScalarDocs').then((m) => ({ default: m.S
 const MockView = lazy(() => import('./MockView').then((m) => ({ default: m.MockView })));
 
 type Tool = 'history';
+const TOOL_PANEL_SIZE = '28%';
 type Doc = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export function ProjectView({
@@ -139,6 +140,17 @@ export function ProjectView({
   }, [roleLoaded, canWrite, canMockRead, mode]);
 
   const openTool = (id: Tool) => setTool(tool === id ? null : id);
+
+  // The inspect panel is sized to zero rather than unmounted: remounting the group re-parses the
+  // spec for the outline and the form, which freezes the tab on a large document. Not `collapsible`
+  // either — a collapse mid-drag closes the tool while the pointer is down, and dragging back
+  // reopens an empty panel.
+  const toolPanel = useRef<PanelImperativeHandle>(null);
+  useEffect(() => {
+    // Deferred a frame: the new minSize lands in a later re-render, so resizing now is clamped by the old one.
+    const frame = requestAnimationFrame(() => toolPanel.current?.resize(tool ? TOOL_PANEL_SIZE : '0%'));
+    return () => cancelAnimationFrame(frame);
+  }, [tool]);
 
   // Publish unsaved state so App can confirm before navigating away. Mock drafts count too —
   // losing unsaved mock code on a stray Back is the same loss as losing spec edits.
@@ -252,7 +264,7 @@ export function ProjectView({
             <OperationStagesProvider projectId={project.id}>
               <div className="flex h-full">
                 <div className="min-w-0 flex-1">
-                  <Group key={tool ? 'open' : 'closed'} orientation="horizontal" className="h-full">
+                  <Group orientation="horizontal" className="h-full">
                     <Panel defaultSize="20%" minSize="12%" collapsible collapsedSize="0%" className="bg-surface">
                       <OutlinePanel
                         doc={doc}
@@ -268,7 +280,7 @@ export function ProjectView({
                     </Panel>
                     <ResizeHandle />
 
-                    <Panel defaultSize={tool ? '52%' : '80%'} minSize="30%">
+                    <Panel defaultSize="80%" minSize="30%">
                       <div className="flex h-full flex-col bg-bg">
                         <SpecEditor
                           project={project}
@@ -282,41 +294,39 @@ export function ProjectView({
                       </div>
                     </Panel>
 
-                    {tool && (
-                      <>
-                        <ResizeHandle />
-                        <Panel defaultSize="28%" minSize="16%" className="bg-surface">
-                          <div className="flex h-full flex-col">
-                            <div className="flex h-9 items-center border-b border-border px-3 text-[13px] text-muted">
-                              <span>{toolLabel}</span>
-                              <div className="flex-1" />
-                              <button
-                                aria-label="close-tool"
-                                className="text-faint hover:text-text"
-                                onClick={() => setTool(null)}
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                            <div className="min-h-0 flex-1 overflow-auto">
-                              {tool === 'history' && (
-                                <History
-                                  projectId={project.id}
-                                  path={activePath}
-                                  dirty={file.dirty}
-                                  editorVersion={file.version}
-                                  focus={historyFocus}
-                                  onRestored={() => {
-                                    file.load();
-                                    onSaved(); // a restore rewrites the document, mocks included
-                                  }}
-                                />
-                              )}
-                            </div>
+                    <ResizeHandle hidden={!tool} />
+                    <Panel panelRef={toolPanel} defaultSize="0%" minSize={tool ? '16%' : '0%'} className="bg-surface">
+                      {tool && (
+                        <div className="flex h-full flex-col">
+                          <div className="flex h-9 items-center border-b border-border px-3 text-[13px] text-muted">
+                            <span>{toolLabel}</span>
+                            <div className="flex-1" />
+                            <button
+                              aria-label="close-tool"
+                              className="text-faint hover:text-text"
+                              onClick={() => setTool(null)}
+                            >
+                              <X size={14} />
+                            </button>
                           </div>
-                        </Panel>
-                      </>
-                    )}
+                          <div className="min-h-0 flex-1 overflow-auto">
+                            {tool === 'history' && (
+                              <History
+                                projectId={project.id}
+                                path={activePath}
+                                dirty={file.dirty}
+                                editorVersion={file.version}
+                                focus={historyFocus}
+                                onRestored={() => {
+                                  file.load();
+                                  onSaved(); // a restore rewrites the document, mocks included
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </Panel>
                   </Group>
                 </div>
 

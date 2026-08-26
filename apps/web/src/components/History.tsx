@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { structuredPatch } from 'diff';
 import { api, type BreakingReport, type VersionMeta } from '../api';
 import { errorText } from '../lib/errors';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useConfirm } from './ConfirmProvider';
+import { DiffPane } from './DiffPane';
 
 /** A version's author → a friendly label: who (@username) + how (imported / restored / external). */
 function authorLabel(v: VersionMeta, t: (k: string, o?: Record<string, unknown>) => string): string {
@@ -37,24 +37,6 @@ function relTime(ts: number, lang: string): string {
   const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
   for (const [unit, ms] of UNITS) if (Math.abs(diff) >= ms) return rtf.format(Math.round(diff / ms), unit);
   return rtf.format(0, 'second');
-}
-
-/** One rendered diff line: a line-number gutter + the +/- body, colored by kind. */
-function DiffLine({ n, kind, text }: { n: number; kind: 'add' | 'del' | 'ctx'; text: string }) {
-  return (
-    <div
-      className={cn(
-        'flex',
-        kind === 'add' && 'bg-post/12 text-post',
-        kind === 'del' && 'bg-delete/12 text-delete',
-        kind === 'ctx' && 'text-faint',
-      )}
-    >
-      <span className="w-9 shrink-0 select-none pr-2 text-right text-faint tabular-nums">{n}</span>
-      <span className="w-3 shrink-0 select-none text-faint">{kind === 'add' ? '+' : kind === 'del' ? '-' : ''}</span>
-      <span className="whitespace-pre-wrap break-all">{text}</span>
-    </div>
-  );
 }
 
 /** Version history: pick two versions, see the text diff + a breaking-change summary, and restore. */
@@ -150,11 +132,6 @@ export function History({
       live = false;
     };
   }, [projectId, path, target, baseNo, hasBase]);
-
-  const hunks = useMemo(() => {
-    if (baseText == null || targetText == null) return null;
-    return structuredPatch('a', 'b', baseText, targetText, '', '', { context: expandAll ? 1e9 : 3 }).hunks;
-  }, [baseText, targetText, expandAll]);
 
   const restore = async (n: number) => {
     const message = dirty ? t('restoreConfirmDirty') : '';
@@ -272,33 +249,11 @@ export function History({
             </div>
           )}
 
-          {/* text diff — only changed hunks (+ context), unchanged runs collapsed */}
-          <div className="min-h-0 flex-1 overflow-auto p-2 font-mono text-[12px] leading-snug">
-            {!hasBase ? (
-              <p className="px-1 text-faint">{t('diffNoBase')}</p>
-            ) : hunks == null ? null : hunks.length === 0 ? (
-              <p className="px-1 text-faint">{t('diffNone')}</p>
-            ) : (
-              hunks.map((h, hi) => {
-                let oldLn = h.oldStart;
-                let newLn = h.newStart;
-                return (
-                  <div key={hi}>
-                    {hi > 0 && <div className="py-1 text-center text-faint">···</div>}
-                    {h.lines.map((line, li) => {
-                      const body = line.slice(1);
-                      if (line[0] === '+') return <DiffLine key={li} n={newLn++} kind="add" text={body} />;
-                      if (line[0] === '-') return <DiffLine key={li} n={oldLn++} kind="del" text={body} />;
-                      if (line[0] === '\\') return null; // "No newline at end of file" marker
-                      const n = newLn++;
-                      oldLn++;
-                      return <DiffLine key={li} n={n} kind="ctx" text={body} />;
-                    })}
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {!hasBase ? (
+            <p className="px-3 py-2 text-[12px] text-faint">{t('diffNoBase')}</p>
+          ) : baseText == null || targetText == null ? null : (
+            <DiffPane base={baseText} target={targetText} expandAll={expandAll} />
+          )}
         </div>
       )}
     </div>
