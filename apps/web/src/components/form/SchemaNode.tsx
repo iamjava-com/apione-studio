@@ -7,6 +7,7 @@ import { ScalarAdvancedPanel, ObjectPropertiesEditor, CompositionEditor } from '
 import { SCHEMAS_REF } from '../../lib/openapi-refs';
 import { primaryType, isNullable, setNullable } from './schema-type';
 import type { Doc } from './types';
+import { cloneNode } from '../../lib/clone';
 
 const COMPOSITION = ['allOf', 'oneOf', 'anyOf'] as const;
 const TYPES = ['string', 'integer', 'number', 'boolean', 'object', 'array', '$ref', ...COMPOSITION] as const;
@@ -102,7 +103,7 @@ export function SchemaNode({
 
   const extractSchema = () =>
     mutate((n, root) => {
-      const model = structuredClone(n);
+      const model = cloneNode(n);
       root.components ??= {};
       root.components.schemas ??= {};
       const name = uniqueSchemaName(Object.keys(root.components.schemas), nameHint ?? 'Schema');
