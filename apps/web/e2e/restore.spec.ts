@@ -44,13 +44,20 @@ test('opening history leaves the editor as it was', async ({ page }) => {
   await page.getByRole('button', { name: 'YAML', exact: true }).click();
   await expect(page.locator('.monaco-editor').first()).toBeVisible();
 
+  // The outline keeps its width through open and close: the tool panel takes from the editor.
+  const outline = page.locator('[data-panel]').first();
+  const outlineWidth = (await outline.boundingBox())!.width;
+  expect(outlineWidth).toBeGreaterThan(100);
+
   await page.getByLabel('tool-history').click();
   await expect(page.getByLabel('compare-base')).toBeVisible();
   await expect(page.locator('.monaco-editor').first()).toBeVisible();
+  expect((await outline.boundingBox())!.width).toBeCloseTo(outlineWidth, 0);
 
   await page.getByLabel('close-tool').click();
   await expect(page.getByLabel('compare-base')).toBeHidden();
   await expect(page.locator('.monaco-editor').first()).toBeVisible();
+  expect((await outline.boundingBox())!.width).toBeCloseTo(outlineWidth, 0);
 });
 
 // The panel cannot be dragged shut: that would close the tool mid-drag, and dragging back would
@@ -84,4 +91,30 @@ test('the history panel cannot be dragged shut', async ({ page }) => {
   await page.getByLabel('tool-history').click();
   await expect(page.getByLabel('compare-base')).toBeVisible();
   expect((await panel.boundingBox())!.width).toBeGreaterThanOrEqual(group.width * 0.16 - 1);
+});
+
+// The tool panel takes its width from the editor, not the outline — including after the outline
+// was dragged to a width of the user's choosing.
+test('opening history keeps the outline at the width it was dragged to', async ({ page }) => {
+  await authenticate(page);
+  await createProject(page, `Outline width ${Date.now()}`);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(msg('saved', { version: 1 }))).toBeVisible();
+
+  const outline = page.locator('[data-panel]').first();
+  const sep = page.locator('[data-separator]').first();
+  const box = (await sep.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 120, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  const dragged = (await outline.boundingBox())!.width;
+  expect(dragged).toBeGreaterThan(box.x + 100);
+
+  await page.getByLabel('tool-history').click();
+  await expect(page.getByLabel('compare-base')).toBeVisible();
+  await expect.poll(async () => (await outline.boundingBox())!.width).toBeCloseTo(dragged, 0);
+  await page.getByLabel('close-tool').click();
+  await expect(page.getByLabel('compare-base')).toBeHidden();
+  await expect.poll(async () => (await outline.boundingBox())!.width).toBeCloseTo(dragged, 0);
 });
