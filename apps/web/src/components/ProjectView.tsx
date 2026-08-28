@@ -78,9 +78,14 @@ export function ProjectView({
   // debounced, in a worker, so it trails typing by a beat. In doc mode the live doc is read
   // directly and the worker gets nothing to do.
   const parsed = useParsedDoc<Doc>(useDebounced(file.mode === 'text' ? file.text : '', 200));
+  // Until that first parse lands, the outline keeps the doc it was showing rather than going blank.
+  const [lastDoc, setLastDoc] = useState<Doc | null>(null);
+  useEffect(() => {
+    if (file.doc) setLastDoc(file.doc);
+  }, [file.doc]);
   // Deferred: a keystroke in the form commits first, and the outline and the palette — which walk
   // every operation — re-render in a low-priority pass that a next keystroke can interrupt.
-  const doc = useDeferredValue(file.mode === 'doc' ? file.doc : parsed);
+  const doc = useDeferredValue(file.mode === 'doc' ? file.doc : (parsed ?? lastDoc));
 
   useRevisit(file.sync);
 

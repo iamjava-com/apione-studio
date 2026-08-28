@@ -4,7 +4,8 @@ import type { ParseRequest, ParseResponse } from '../workers/yaml-parse.worker';
 /**
  * `text` parsed as YAML, in a worker: a large spec takes hundreds of milliseconds to parse, and
  * on the main thread that blocks every keystroke in the editor. Trails the text by one parse;
- * null while the first parse is pending or when the text does not parse.
+ * null while the first parse is pending, when the text does not parse, and for empty text (which
+ * is what a caller passes when it has no text to show — no parse is posted for it).
  */
 export function useParsedDoc<T>(text: string): T | null {
   const [doc, setDoc] = useState<T | null>(null);
@@ -25,7 +26,8 @@ export function useParsedDoc<T>(text: string): T | null {
 
   useEffect(() => {
     ticket.current += 1;
-    worker.current?.postMessage({ id: ticket.current, text } satisfies ParseRequest);
+    if (text === '') setDoc(null);
+    else worker.current?.postMessage({ id: ticket.current, text } satisfies ParseRequest);
   }, [text]);
 
   return doc;
