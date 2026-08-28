@@ -251,7 +251,7 @@ export function History({
               <DiffPane base={baseText} target={targetText} expandAll={expandAll} />
             )
           ) : (
-            <HistoryChanges changes={changes.changes} />
+            <HistoryChanges changes={changes.changes} baseText={baseText} targetText={targetText} />
           )}
         </div>
       )}
