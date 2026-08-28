@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Group, Panel, type PanelImperativeHandle } from 'react-resizable-panels';
+import { Group, Panel, type GroupImperativeHandle } from 'react-resizable-panels';
 import YAML from 'yaml';
 import { Clock, Settings, X } from 'lucide-react';
 import { api, type Permission, type Project } from '../api';
@@ -32,7 +32,11 @@ const ScalarDocs = lazy(() => import('./ScalarDocs').then((m) => ({ default: m.S
 const MockView = lazy(() => import('./MockView').then((m) => ({ default: m.MockView })));
 
 type Tool = 'history';
-const TOOL_PANEL_SIZE = '28%';
+// Percentages of the workspace group; the panels' size props say the same numbers.
+const OUTLINE_DEFAULT = 20;
+const TOOL_PANEL_SIZE = 28;
+const TOOL_PANEL_MIN = 16;
+const EDITOR_MIN = 30;
 type Doc = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export function ProjectView({
@@ -138,11 +142,24 @@ export function ProjectView({
   // The inspect panel is sized to zero rather than unmounted: remounting the group re-parses the
   // spec for the outline and the form, which freezes the tab on a large document. Not `collapsible`
   // either — a collapse mid-drag closes the tool while the pointer is down, and dragging back
-  // reopens an empty panel.
-  const toolPanel = useRef<PanelImperativeHandle>(null);
+  // reopens an empty panel. The whole layout is set from the outline share the user last dragged
+  // to: switching the tool's minSize makes the library re-validate the layout, and it does that by
+  // collapsing the outline, so the current layout cannot be trusted at that moment.
+  const group = useRef<GroupImperativeHandle>(null);
+  const outlineShare = useRef(OUTLINE_DEFAULT);
   useEffect(() => {
-    // Deferred a frame: the new minSize lands in a later re-render, so resizing now is clamped by the old one.
-    const frame = requestAnimationFrame(() => toolPanel.current?.resize(tool ? TOOL_PANEL_SIZE : '0%'));
+    // Deferred a frame: the new minSize lands in a later re-render, and a layout set before that is clamped by the old one.
+    const frame = requestAnimationFrame(() => {
+      const g = group.current;
+      if (!g) return;
+      let outline = outlineShare.current;
+      let want = tool ? TOOL_PANEL_SIZE : 0;
+      if (tool && 100 - outline - want < EDITOR_MIN) {
+        want = Math.max(TOOL_PANEL_MIN, 100 - outline - EDITOR_MIN);
+        outline = Math.min(outline, 100 - EDITOR_MIN - want);
+      }
+      g.setLayout({ outline, editor: 100 - outline - want, tool: want });
+    });
     return () => cancelAnimationFrame(frame);
   }, [tool]);
 
@@ -258,8 +275,22 @@ export function ProjectView({
             <OperationStagesProvider projectId={project.id}>
               <div className="flex h-full">
                 <div className="min-w-0 flex-1">
-                  <Group orientation="horizontal" className="h-full">
-                    <Panel defaultSize="20%" minSize="12%" collapsible collapsedSize="0%" className="bg-surface">
+                  <Group
+                    groupRef={group}
+                    onLayoutChanged={(layout, meta) => {
+                      if (meta.isUserInteraction) outlineShare.current = layout.outline;
+                    }}
+                    orientation="horizontal"
+                    className="h-full"
+                  >
+                    <Panel
+                      id="outline"
+                      defaultSize="20%"
+                      minSize="12%"
+                      collapsible
+                      collapsedSize="0%"
+                      className="bg-surface"
+                    >
                       <OutlinePanel
                         doc={doc}
                         selection={selection}
@@ -274,7 +305,7 @@ export function ProjectView({
                     </Panel>
                     <ResizeHandle />
 
-                    <Panel defaultSize="80%" minSize="30%">
+                    <Panel id="editor" defaultSize="80%" minSize="30%">
                       <div className="flex h-full flex-col bg-bg">
                         <SpecEditor
                           project={project}
@@ -289,7 +320,7 @@ export function ProjectView({
                     </Panel>
 
                     <ResizeHandle hidden={!tool} />
-                    <Panel panelRef={toolPanel} defaultSize="0%" minSize={tool ? '16%' : '0%'} className="bg-surface">
+                    <Panel id="tool" defaultSize="0%" minSize={tool ? '16%' : '0%'} className="bg-surface">
                       {tool && (
                         <div className="flex h-full flex-col">
                           <div className="flex h-9 items-center border-b border-border px-3 text-[13px] text-muted">
