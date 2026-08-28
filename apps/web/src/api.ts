@@ -86,7 +86,9 @@ export interface BreakingChange {
   id: string;
   level: 'error' | 'warning' | 'info';
   text: string;
-  operation: string | null;
+  operation: string | null; // "GET /users/{id}"
+  method: string | null;
+  path: string | null;
   section: string | null;
 }
 export interface BreakingReport {
@@ -185,6 +187,14 @@ function unauthorized(): void {
 }
 
 const enc = (p: string) => p.split('/').map(encodeURIComponent).join('/');
+function versionsQuery(id: string, route: string, base?: number, target?: number): string {
+  const q = new URLSearchParams();
+  if (base) q.set('base', String(base));
+  if (target) q.set('target', String(target));
+  const qs = q.toString();
+  return `/api/projects/${id}/${route}${qs ? `?${qs}` : ''}`;
+}
+
 export const api = {
   listGroups: () => http<Group[]>('GET', '/api/groups'),
   createGroup: (name: string) => http<Group>('POST', '/api/groups', { name }),
@@ -221,13 +231,10 @@ export const api = {
   importSpec: (id: string, content: string, format: 'auto' | 'oas3' | 'swagger2' | 'postman' = 'auto') =>
     http<{ version: number; sourceFormat: string }>('POST', `/api/projects/${id}/import`, { content, format }),
   lint: (id: string) => http<LintResult>('GET', `/api/projects/${id}/lint`),
-  breaking: (id: string, base?: number, target?: number) => {
-    const q = new URLSearchParams();
-    if (base) q.set('base', String(base));
-    if (target) q.set('target', String(target));
-    const qs = q.toString();
-    return http<BreakingReport>('GET', `/api/projects/${id}/breaking${qs ? `?${qs}` : ''}`);
-  },
+  breaking: (id: string, base?: number, target?: number) =>
+    http<BreakingReport>('GET', versionsQuery(id, 'breaking', base, target)),
+  changelog: (id: string, base?: number, target?: number) =>
+    http<BreakingReport>('GET', versionsQuery(id, 'changelog', base, target)),
   graph: (id: string) => http<GraphResult>('GET', `/api/projects/${id}/graph`),
 
   // ── workflow stages (kept out of the spec: setting one writes no version) ──

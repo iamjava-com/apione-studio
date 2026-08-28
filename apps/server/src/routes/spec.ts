@@ -11,6 +11,7 @@ import { TAG, anyObject, breakingReport, errorResponse, graphResult, lintResult,
 
 const canRead = { preHandler: requirePermission('spec:read') };
 const canWrite = { preHandler: requirePermission('spec:write') };
+const canReadHistory = { preHandler: requirePermission('history:read') };
 
 const readErrors = { 401: errorResponse, 404: errorResponse };
 const exportQuery = {
@@ -208,6 +209,32 @@ export async function specRoutes(app: FastifyInstance): Promise<void> {
       const { projectId } = req.params as { projectId: string };
       const { base, target } = req.query as { base?: number; target?: number };
       return spec.breakingProject(projectId, base, target);
+    },
+  );
+
+  // Full semantic changelog between two versions — what the history panel lists per endpoint.
+  // Reads version content, so it sits behind history:read like the versions themselves.
+  app.get(
+    '/:projectId/changelog',
+    {
+      ...canReadHistory,
+      schema: {
+        tags: [TAG.spec],
+        summary: 'Every semantic change between two versions of the spec',
+        description:
+          'Like /breaking, info-level changes included. Defaults to the previous version against the current one. `available: false` means the oasdiff engine is not installed.',
+        params: projectIdParam,
+        querystring: {
+          type: 'object',
+          properties: { base: { type: 'integer', minimum: 1 }, target: { type: 'integer', minimum: 1 } },
+        },
+        response: { 200: breakingReport, ...readErrors },
+      },
+    },
+    async (req) => {
+      const { projectId } = req.params as { projectId: string };
+      const { base, target } = req.query as { base?: number; target?: number };
+      return spec.changelogProject(projectId, base, target);
     },
   );
 }

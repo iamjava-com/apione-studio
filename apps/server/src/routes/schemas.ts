@@ -194,6 +194,7 @@ export const lintResult = {
   },
 };
 
+/** One shape for `/breaking` and `/changelog`: the same rows, filtered differently. */
 export const breakingReport = {
   type: 'object',
   additionalProperties: true,
@@ -209,7 +210,15 @@ export const breakingReport = {
       items: {
         type: 'object',
         additionalProperties: true,
-        properties: { id: string, level: string, text: string, operation: nullableString, section: nullableString },
+        properties: {
+          id: string,
+          level: string,
+          text: string,
+          operation: nullableString,
+          method: nullableString,
+          path: nullableString,
+          section: nullableString,
+        },
       },
     },
   },
