@@ -31,13 +31,29 @@ A pure OpenAPI studio: design, docs, mock, collaboration.
 - **`$ref` stays inside the project directory:** enforced in the engine adapter's `loadExternalRef`. No remote refs; realpath first, then compare the prefix.
 - Secrets never reach the spec or git; exports exclude sensitive values.
 
-## Verification
+## Workflow
 
-- Run `npm run verify` (= `check` + `e2e`) after changing code. **`npm run check` excludes e2e** — running it alone is not verification.
-- e2e owns ports 4100/5173 and fails outright if the dev server is up: stop it, run, start it back. Not a reason to skip.
+Every step that touches git or the remote — commit, push, PR, merge, tag — waits for the maintainer's word. An agent changes files and verifies; it does not commit, push, open or amend a PR until the maintainer has reviewed that change and said to. A question or a discussion is not that.
+
+**Every change**
+
+1. Branch off `next` (`fix/…`, `feat/…`, `chore/…`). Never commit on `main` or `next` directly.
+2. Run `npm run verify` (= `check` + `e2e`) — all of it. **`npm run check` excludes e2e**; running it alone is not verification. e2e owns ports 4100/5173 and fails outright if the dev server is up: stop it (kill `concurrently` and `tsx watch`, not just the ports), run, start it back.
+3. Anything visible: build the web bundle and serve it from a second server instance on a copy of the dev data, so it can be tried by hand — dev mode inflates React render 3–5×, and e2e cannot see a flash or a jump.
+4. Stop with the change uncommitted and report what changed.
+5. On the maintainer's word: commit, push, `gh pr create` against `next`. The PR title is the commit it becomes (`fix:` / `feat:` / `chore:`, ≤72 chars, written for the CHANGELOG reader). One PR = one thing. No `Co-Authored-By` trailer.
+6. The maintainer merges on the PR page (squash, delete branch).
+
+**Every release**
+
+7. `next` holds unreleased work; dropping a feature is a revert of its one commit. To try it in production first: a local throwaway `rc/x.y` branch, deployed under an rc tag.
+8. Release = one PR `next → main`, merged with **rebase** so each feature keeps its commit. release-please then opens the release PR; merging it is the release. Never commit on release-please's branch. Never force-push `main`.
+
+**Tests**
+
 - New behavior gets a test: interaction (drag, dialogs, routing, cross-panel sync) in `apps/web/e2e`, everything else in `apps/server/test`.
 - A bug-fix test must fail before the fix, or it is not testing what you think.
-- Never regenerate an applied migration; add a new one.
+- Never regenerate an applied migration; add a new one. Migrations are additive only — a blue-green deploy runs two processes on one database for a few seconds.
 
 ## Copy and comments
 
