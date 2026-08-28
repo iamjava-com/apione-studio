@@ -17,31 +17,37 @@ const pexec = (args: string[]) =>
   execOasdiff('oasdiff', args, { timeout: OASDIFF_TIMEOUT_MS, maxBuffer: OASDIFF_MAX_OUTPUT_BYTES });
 
 /**
- * Adapter over the `oasdiff` CLI (Go binary) — breaking-change detection.
- * We shell out to the binary rather than reimplement diff rules; the rest of the app
- * only sees this module.
+ * Adapter over the `oasdiff` CLI (Go binary) — semantic diff of two specs, as breaking changes
+ * only or as the full changelog. We shell out to the binary rather than reimplement diff rules;
+ * the rest of the app only sees this module.
  * The binary is optional at runtime — callers check isAvailable() and degrade gracefully.
  */
 
-export type BreakingLevel = 'error' | 'warning' | 'info';
+export type ChangeLevel = 'error' | 'warning' | 'info';
+export type DiffKind = 'breaking' | 'changelog';
 
-export interface BreakingChange {
+export interface Change {
   id: string;
-  level: BreakingLevel;
+  level: ChangeLevel;
   text: string;
   operation: string | null; // e.g. "GET /users/{id}"
+  method: string | null; // the two halves of `operation`, for grouping
+  path: string | null;
   section: string | null;
 }
+/** @deprecated alias — the breaking report and the changelog carry the same rows. */
+export type BreakingChange = Change;
 
 /** oasdiff numeric levels: 3 = ERR, 2 = WARN, 1 = INFO. Accept strings too, for safety. */
-function mapLevel(l: unknown): BreakingLevel {
+function mapLevel(l: unknown): ChangeLevel {
   if (l === 3 || l === 'ERR' || l === 'error') return 'error';
   if (l === 2 || l === 'WARN' || l === 'warning') return 'warning';
   return 'info';
 }
 
-/** Parse `oasdiff breaking -f json` stdout. Exported for unit testing without the binary. */
-export function parseBreaking(stdout: string): BreakingChange[] {
+/** Parse `oasdiff breaking|changelog -f json` stdout (same shape). Exported for unit testing
+ * without the binary. */
+export function parseChanges(stdout: string): Change[] {
   const raw = stdout.trim();
   if (!raw) return [];
   const arr = JSON.parse(raw) as Array<Record<string, unknown>>;
@@ -53,6 +59,8 @@ export function parseBreaking(stdout: string): BreakingChange[] {
       level: mapLevel(c.level),
       text: String(c.text ?? ''),
       operation: op || p ? `${op} ${p}`.trim() : null,
+      method: op || null,
+      path: p || null,
       section: c.section ? String(c.section) : null,
     };
   });
@@ -73,24 +81,25 @@ export async function isAvailable(): Promise<boolean> {
 }
 
 /**
- * Diff two spec documents and return breaking changes (base → revision).
- * Both specs are written to a private temp dir; oasdiff resolves them by file path.
+ * Diff two spec documents (base → revision): `breaking` reports what would break a client,
+ * `changelog` every semantic change, info level included. Both specs are written to a private
+ * temp dir; oasdiff resolves them by file path.
  */
-export async function diffBreaking(baseSpec: string, revisionSpec: string): Promise<BreakingChange[]> {
+export async function diffChanges(kind: DiffKind, baseSpec: string, revisionSpec: string): Promise<Change[]> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oasdiff-'));
   const baseFile = path.join(dir, 'base.yaml');
   const revFile = path.join(dir, 'revision.yaml');
   try {
     fs.writeFileSync(baseFile, baseSpec, 'utf8');
     fs.writeFileSync(revFile, revisionSpec, 'utf8');
-    const { stdout } = await pexec(['breaking', baseFile, revFile, '-f', 'json']).catch(
+    const { stdout } = await pexec([kind, baseFile, revFile, '-f', 'json']).catch(
       (e: NodeJS.ErrnoException & { stdout?: string }) => {
         // Defensive: some versions exit non-zero when changes are found; stdout still holds JSON.
         if (typeof e.stdout === 'string') return { stdout: e.stdout };
         throw e;
       },
     );
-    return parseBreaking(stdout);
+    return parseChanges(stdout);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

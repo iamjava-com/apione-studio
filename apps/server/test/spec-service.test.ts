@@ -121,7 +121,7 @@ components:
 });
 
 test('oasdiff parse: numeric levels map to error/warning; operation is composed', async () => {
-  const { parseBreaking } = await import('../src/engines/oasdiff.js');
+  const { parseChanges: parseBreaking } = await import('../src/engines/oasdiff.js');
   const sample = JSON.stringify([
     {
       id: 'api-path-removed-without-deprecation',
@@ -137,8 +137,45 @@ test('oasdiff parse: numeric levels map to error/warning; operation is composed'
   assert.equal(out.length, 2);
   assert.equal(out[0]!.level, 'error');
   assert.equal(out[0]!.operation, 'GET /gone');
+  assert.equal(out[0]!.method, 'GET');
+  assert.equal(out[0]!.path, '/gone');
   assert.equal(out[1]!.level, 'warning');
   assert.deepEqual(parseBreaking(''), []);
+});
+
+test('changelog: an added endpoint is an info-level change, which breaking leaves out', async () => {
+  const p = projectSvc.createProject('Changelog');
+  const v1 = `openapi: 3.1.0
+info: { title: C, version: 1.0.0 }
+paths:
+  /keep:
+    get:
+      responses: { '200': { description: ok } }
+`;
+  const v2 = `openapi: 3.1.0
+info: { title: C, version: 1.0.0 }
+paths:
+  /keep:
+    get:
+      responses: { '200': { description: ok } }
+  /added:
+    post:
+      responses: { '201': { description: created } }
+`;
+  const w1 = fileSvc.writeFile(p.id, 'openapi.yaml', v1, 0);
+  fileSvc.writeFile(p.id, 'openapi.yaml', v2, w1.version);
+
+  const log = await specSvc.changelogProject(p.id);
+  const breaking = await specSvc.breakingProject(p.id);
+  assert.equal(log.baseVersion, 1);
+  assert.equal(log.targetVersion, 2);
+  if (!log.available) return assert.deepEqual(log.changes, []); // no binary: empty, not wrong
+  const added = log.changes.find((c) => c.id === 'endpoint-added');
+  assert.ok(added, `expected endpoint-added, got ${JSON.stringify(log.changes)}`);
+  assert.equal(added.level, 'info');
+  assert.equal(added.method, 'POST');
+  assert.equal(added.path, '/added');
+  assert.equal(breaking.changes.length, 0);
 });
 
 test('breaking: removing a path between versions is reported (when oasdiff is installed)', async () => {
