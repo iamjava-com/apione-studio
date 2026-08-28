@@ -35,6 +35,7 @@ test('history diffs two differently written versions off the main thread', async
   // History defaults to head vs the version before it: v3 vs v2.
   await page.getByLabel('tool-history').click();
   await expect(page.getByLabel('compare-base')).toBeVisible();
+  await page.getByRole('button', { name: msg('showFileDiff') }).click();
   await expect(page.getByText('/r0:').first()).toBeVisible();
   await expect(page.getByText('successful operation').first()).toBeVisible();
 });
