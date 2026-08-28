@@ -107,26 +107,28 @@ export function stripExtensions<T>(node: T): T {
   return node;
 }
 
-export interface BreakingReport {
+export interface ChangeReport {
   available: boolean; // is the oasdiff engine installed?
   baseVersion: number | null; // null when base/target don't form a valid comparison
   targetVersion: number; // the version compared TO (defaults to the current head)
   errorCount: number;
   warnCount: number;
-  changes: oasdiff.BreakingChange[];
+  changes: oasdiff.Change[];
 }
+export type BreakingReport = ChangeReport;
 
 /**
- * Breaking-change report for a spec file: semantically diff base → target (both saved
- * versions). Defaults target to the current head and base to target-1 — the natural
- * "did my last save break anyone?" question, answered straight from the version history.
+ * Semantic diff of two saved versions of a spec file, base → target: breaking changes only, or
+ * the full changelog. Defaults target to the current head and base to target-1 — the natural
+ * "what did my last save change?" question, answered straight from the version history.
  */
-async function breakingChangesForFile(
+async function changesForFile(
   projectId: string,
   filePath: string,
+  kind: oasdiff.DiffKind,
   baseVersion?: number,
   targetVersion?: number,
-): Promise<BreakingReport> {
+): Promise<ChangeReport> {
   const current = fsvc.readFile(projectId, filePath);
   const target = targetVersion ?? current.version;
   const base = baseVersion ?? target - 1;
@@ -142,7 +144,7 @@ async function breakingChangesForFile(
   const baseContent = fsvc.getVersionContent(projectId, filePath, base).content;
   const targetContent =
     target === current.version ? current.content : fsvc.getVersionContent(projectId, filePath, target).content;
-  const changes = await oasdiff.diffBreaking(baseContent, targetContent);
+  const changes = await oasdiff.diffChanges(kind, baseContent, targetContent);
   return {
     available,
     baseVersion: base,
@@ -158,8 +160,17 @@ export function breakingProject(
   projectId: string,
   baseVersion?: number,
   targetVersion?: number,
-): Promise<BreakingReport> {
-  return breakingChangesForFile(projectId, rootFileName(projectId), baseVersion, targetVersion);
+): Promise<ChangeReport> {
+  return changesForFile(projectId, rootFileName(projectId), 'breaking', baseVersion, targetVersion);
+}
+
+/** Every semantic change to the project's root spec between two versions, info level included. */
+export function changelogProject(
+  projectId: string,
+  baseVersion?: number,
+  targetVersion?: number,
+): Promise<ChangeReport> {
+  return changesForFile(projectId, rootFileName(projectId), 'changelog', baseVersion, targetVersion);
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
