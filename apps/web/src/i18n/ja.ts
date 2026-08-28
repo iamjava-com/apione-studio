@@ -79,6 +79,8 @@ export const ja: Record<keyof TranslationKeys, string> = {
   diffOnlyChanged: '変更のみ',
   diffAll: 'すべて表示',
   diffNone: '差分はありません。',
+  diffTooDifferent: '2 つのバージョンの差分が大きすぎて、行単位では比較できません。',
+  diffComputing: '比較中…',
   diffNoBase: 'これは最初のバージョンです——比較対象がありません。',
   restoreTo: 'v{{v}} に復元',
   restoreConfirmTitle: 'v{{v}} に復元しますか？',

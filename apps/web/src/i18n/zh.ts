@@ -77,6 +77,8 @@ export const zh: Record<keyof TranslationKeys, string> = {
   diffOnlyChanged: '仅变更',
   diffAll: '显示全部',
   diffNone: '无差异。',
+  diffTooDifferent: '两个版本差异太大，无法逐行对比。',
+  diffComputing: '对比中…',
   diffNoBase: '这是最早的版本，没有更早的版本可对比。',
   restoreTo: '还原到 v{{v}}',
   restoreConfirmTitle: '还原到 v{{v}}？',

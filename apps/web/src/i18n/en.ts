@@ -76,6 +76,8 @@ export const en = {
   diffOnlyChanged: 'Changed only',
   diffAll: 'Show all',
   diffNone: 'No changes.',
+  diffTooDifferent: 'These versions differ too much for a line-by-line diff.',
+  diffComputing: 'Comparing…',
   diffNoBase: 'This is the earliest version — nothing to compare against.',
   restoreTo: 'Restore v{{v}}',
   restoreConfirmTitle: 'Restore v{{v}}?',
