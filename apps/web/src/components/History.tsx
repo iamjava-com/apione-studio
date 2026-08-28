@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useConfirm } from './ConfirmProvider';
 import { DiffPane } from './DiffPane';
+import { HistoryChanges } from './HistoryChanges';
 
 /** A version's author → a friendly label: who (@username) + how (imported / restored / external). */
 function authorLabel(v: VersionMeta, t: (k: string, o?: Record<string, unknown>) => string): string {
@@ -39,7 +40,7 @@ function relTime(ts: number, lang: string): string {
   return rtf.format(0, 'second');
 }
 
-/** Version history: pick two versions, see the text diff + a breaking-change summary, and restore. */
+/** Version history: pick two versions, see what changed per endpoint (or the text diff), and restore. */
 export function History({
   projectId,
   path,
@@ -64,10 +65,10 @@ export function History({
   const [base, setBase] = useState<number | 'prev'>('prev'); // compare against (left side)
   const [baseText, setBaseText] = useState<string | null>(null);
   const [targetText, setTargetText] = useState<string | null>(null);
-  const [breaking, setBreaking] = useState<BreakingReport | null>(null);
+  const [changes, setChanges] = useState<BreakingReport | null>(null);
   const [expandAll, setExpandAll] = useState(false);
+  const [fileDiff, setFileDiff] = useState(false); // the whole-file text diff instead of the changelog
   const [restoreError, setRestoreError] = useState<string | null>(null);
-  const [showBreakList, setShowBreakList] = useState(false);
 
   const baseNo = target != null ? (base === 'prev' ? target - 1 : base) : 0;
   const hasBase = target != null && baseNo >= 1;
@@ -103,16 +104,15 @@ export function History({
     setTarget(focus.target);
   }, [focus]);
 
-  // Fetch both sides + the breaking summary whenever the base→target selection changes.
+  // Fetch both sides + the changelog whenever the base→target selection changes.
   useEffect(() => {
     if (target == null || !hasBase) {
       setBaseText(null);
       setTargetText(null);
-      setBreaking(null);
+      setChanges(null);
       return;
     }
     let live = true;
-    setShowBreakList(false);
     Promise.all([api.getVersionContent(projectId, path, baseNo), api.getVersionContent(projectId, path, target)])
       .then(([b, tg]) => {
         if (!live) return;
@@ -125,9 +125,9 @@ export function History({
         setTargetText(null);
       });
     api
-      .breaking(projectId, baseNo, target)
-      .then((r) => live && setBreaking(r))
-      .catch(() => live && setBreaking(null));
+      .changelog(projectId, baseNo, target)
+      .then((r) => live && setChanges(r))
+      .catch(() => live && setChanges(null));
     return () => {
       live = false;
     };
@@ -149,6 +149,8 @@ export function History({
   };
 
   const olderThanTarget = versions.filter((v) => target != null && v.versionNo < target);
+  // The text diff is the fallback when the engine is missing, and a choice otherwise.
+  const showText = changes != null && (!changes.available || fileDiff);
 
   return (
     <div className="flex h-full flex-col">
@@ -203,12 +205,22 @@ export function History({
             <span className="font-mono text-[12px] text-faint">
               {hasBase ? `v${baseNo}` : '—'} → v{target}
             </span>
-            <button
-              className="text-[12px] text-muted underline-offset-2 hover:text-text hover:underline"
-              onClick={() => setExpandAll((x) => !x)}
-            >
-              {expandAll ? t('diffOnlyChanged') : t('diffAll')}
-            </button>
+            {hasBase && changes?.available && (
+              <button
+                className="text-[12px] text-muted underline-offset-2 hover:text-text hover:underline"
+                onClick={() => setFileDiff((x) => !x)}
+              >
+                {fileDiff ? t('showChanges') : t('showFileDiff')}
+              </button>
+            )}
+            {showText && (
+              <button
+                className="text-[12px] text-muted underline-offset-2 hover:text-text hover:underline"
+                onClick={() => setExpandAll((x) => !x)}
+              >
+                {expandAll ? t('diffOnlyChanged') : t('diffAll')}
+              </button>
+            )}
             <div className="flex-1" />
             {target < head && (
               <Button size="sm" onClick={() => void restore(target)}>
@@ -217,42 +229,29 @@ export function History({
             )}
           </div>
 
-          {/* breaking-change summary for the same base → target */}
-          {hasBase && breaking && (
+          {/* one line of counts: what the changelog holds, and why it is missing when it is */}
+          {hasBase && changes && (
             <div className="border-b border-border px-3 py-1.5 text-[12px]">
-              {!breaking.available ? (
+              {!changes.available ? (
                 <span className="text-faint">{t('oasdiffMissing')}</span>
-              ) : breaking.changes.length === 0 ? (
+              ) : changes.errorCount + changes.warnCount === 0 ? (
                 <span className="text-post">✓ {t('breakingNone')}</span>
               ) : (
-                <button className="text-put hover:underline" onClick={() => setShowBreakList((s) => !s)}>
-                  ⚠ {t('errors', { count: breaking.errorCount })} · {t('warnings', { count: breaking.warnCount })}
-                </button>
-              )}
-              {showBreakList && breaking.available && (
-                <div className="mt-1.5 space-y-1.5">
-                  {breaking.changes.map((c, i) => (
-                    <div
-                      key={i}
-                      className="rounded border-l-2 py-1 pl-2"
-                      style={{ borderColor: c.level === 'error' ? 'var(--color-delete)' : 'var(--color-put)' }}
-                    >
-                      <div className="text-text">{c.text}</div>
-                      <div className="font-mono text-[11px] text-faint">
-                        {c.operation ? `${c.operation} · ` : ''}
-                        {c.id}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <span className="text-put">
+                  ⚠ {t('errors', { count: changes.errorCount })} · {t('warnings', { count: changes.warnCount })}
+                </span>
               )}
             </div>
           )}
 
           {!hasBase ? (
             <p className="px-3 py-2 text-[12px] text-faint">{t('diffNoBase')}</p>
-          ) : baseText == null || targetText == null ? null : (
-            <DiffPane base={baseText} target={targetText} expandAll={expandAll} />
+          ) : changes == null ? null : showText ? (
+            baseText == null || targetText == null ? null : (
+              <DiffPane base={baseText} target={targetText} expandAll={expandAll} />
+            )
+          ) : (
+            <HistoryChanges changes={changes.changes} />
           )}
         </div>
       )}
