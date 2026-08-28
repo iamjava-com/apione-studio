@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { structuredPatch } from 'diff';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '../lib/utils';
+import { useLineDiff } from '../hooks/useLineDiff';
 
 type Row = { kind: 'add' | 'del' | 'ctx'; n: number; text: string } | { kind: 'gap' };
 
@@ -51,10 +51,9 @@ function DiffLine({ n, kind, text }: { n: number; kind: 'add' | 'del' | 'ctx'; t
  */
 export function DiffPane({ base, target, expandAll }: { base: string; target: string; expandAll: boolean }) {
   const { t } = useTranslation();
-  const rows = useMemo(
-    () => toRows(structuredPatch('a', 'b', base, target, '', '', { context: expandAll ? 1e9 : 3 }).hunks),
-    [base, target, expandAll],
-  );
+  const diff = useLineDiff(base, target, expandAll ? 1e9 : 3);
+  const hunks = diff.status === 'done' ? diff.hunks : null;
+  const rows = useMemo(() => (hunks ? toRows(hunks) : []), [hunks]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // useVirtualizer returns unmemoizable functions, so React Compiler skips this component —
@@ -73,7 +72,11 @@ export function DiffPane({ base, target, expandAll }: { base: string; target: st
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto p-2 font-mono text-[12px] leading-snug">
-      {rows.length === 0 ? (
+      {diff.status === 'pending' ? (
+        <p className="px-1 text-faint">{t('diffComputing')}</p>
+      ) : diff.status === 'gaveUp' ? (
+        <p className="px-1 text-faint">{t('diffTooDifferent')}</p>
+      ) : rows.length === 0 ? (
         <p className="px-1 text-faint">{t('diffNone')}</p>
       ) : (
         <div className="relative w-full" style={{ height: virt.getTotalSize() }}>
