@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Group, Panel, type GroupImperativeHandle } from 'react-resizable-panels';
 import { Clock, Settings, X } from 'lucide-react';
@@ -83,20 +83,7 @@ export function ProjectView({
   useEffect(() => {
     if (file.doc) setLastDoc(file.doc);
   }, [file.doc]);
-  // Deferred: a keystroke in the form commits first, and the outline and the palette — which walk
-  // every operation — re-render in a low-priority pass that a next keystroke can interrupt. Not
-  // for the outline's own edits: a drop shown against the old order for a frame is a visible jump.
-  const liveDoc = file.mode === 'doc' ? file.doc : (parsed ?? lastDoc);
-  const deferredDoc = useDeferredValue(liveDoc);
-  const [outlineEdit, setOutlineEdit] = useState(false);
-  useEffect(() => {
-    if (deferredDoc === liveDoc) setOutlineEdit(false);
-  }, [deferredDoc, liveDoc]);
-  const doc = outlineEdit ? liveDoc : deferredDoc;
-  const updateFromOutline = (mutate: (d: Doc) => void) => {
-    setOutlineEdit(true);
-    file.update(mutate);
-  };
+  const doc = file.mode === 'doc' ? file.doc : (parsed ?? lastDoc);
 
   useRevisit(file.sync);
 
@@ -298,7 +285,7 @@ export function ProjectView({
                         doc={doc}
                         selection={selection}
                         onSelect={select}
-                        updateDoc={updateFromOutline}
+                        updateDoc={file.update}
                         graph={graph}
                         files={files}
                         activePath={activePath}
