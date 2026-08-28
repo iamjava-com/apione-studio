@@ -20,6 +20,9 @@ test('history lists the endpoint a save added, and can switch to the text diff',
   await expect(row).toContainText(msg('changeAdded'));
   await row.click();
   await expect(page.getByText('endpoint-added')).toBeVisible();
+  // ...and a diff of just that endpoint: its lines, none of the rest of the file.
+  await expect(page.getByText('responses:').first()).toBeVisible();
+  await expect(page.getByText('/hello:')).toHaveCount(0);
 
   // The text diff is still there, one click away.
   await page.getByRole('button', { name: msg('showFileDiff') }).click();
