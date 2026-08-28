@@ -16,16 +16,14 @@ import { PendingEditsProvider } from './form/PendingEdits';
 type View = 'form' | 'yaml';
 
 /**
- * The editor surface: a shared save bar + Form/YAML toggle over one spec file.
- * The file lives in the parent (shared with the sidebar outline); `docRevision`
- * bumps when the sidebar edits the doc, so the Form view re-syncs. `selection`
- * drives the master-detail form.
+ * The editor surface: a shared save bar + Form/YAML toggle over one spec file. The file lives in
+ * the parent (shared with the sidebar outline); the toggle switches its mode, so the form and the
+ * YAML editor each work on the representation they own. `selection` drives the master-detail form.
  */
 export function SpecEditor({
   project,
   file,
   lint,
-  docRevision,
   selection,
   onSelect,
   onViewDiff,
@@ -33,7 +31,6 @@ export function SpecEditor({
   project: Project;
   file: SpecFile;
   lint: LintResult | null;
-  docRevision?: number;
   selection: Selection;
   onSelect: (s: Selection) => void;
   onViewDiff: () => void;
@@ -82,7 +79,11 @@ export function SpecEditor({
           {(['form', 'yaml'] as const).map((v) => (
             <button
               key={v}
-              onClick={() => setView(v)}
+              onClick={() => {
+                // Form over text that does not parse stays in text mode and says so (FormView).
+                file.switchMode(v === 'form' ? 'doc' : 'text');
+                setView(v);
+              }}
               className={cn(
                 'rounded px-2 py-0.5 text-[13px] transition-colors',
                 view === v ? 'bg-raised text-text' : 'text-muted hover:text-text',
@@ -129,11 +130,11 @@ export function SpecEditor({
       <div className="min-h-0 flex-1">
         {view === 'yaml' ? (
           <Suspense fallback={<div className="h-full" />}>
-            <YamlView file={file} docRevision={docRevision} />
+            <YamlView file={file} />
           </Suspense>
         ) : (
           <PendingEditsProvider onChange={(d) => setPendingEdits((n) => Math.max(0, n + d))}>
-            <FormView file={file} docRevision={docRevision} selection={selection} onSelect={onSelect} />
+            <FormView file={file} selection={selection} onSelect={onSelect} />
           </PendingEditsProvider>
         )}
       </div>

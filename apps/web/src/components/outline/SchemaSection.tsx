@@ -8,6 +8,7 @@ import { useConfirm } from '../ConfirmProvider';
 import type { Selection } from '../../lib/router';
 import { MethodBadge } from '../ui/method-badge';
 import { NavGroup, NavItem, RowActions } from './nav';
+import { cloneNode } from '../../lib/clone';
 
 type Doc = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -73,12 +74,7 @@ export function SchemaSection({
   const duplicate = (name: string) => {
     const key = uniqueKey(Object.keys(doc?.components?.schemas ?? {}), name);
     updateDoc((d) => {
-      d.components.schemas = insertAfterKey(
-        d.components.schemas,
-        name,
-        key,
-        structuredClone(d.components.schemas[name]),
-      );
+      d.components.schemas = insertAfterKey(d.components.schemas, name, key, cloneNode(d.components.schemas[name]));
     });
     onSelect({ kind: 'schema', name: key });
   };

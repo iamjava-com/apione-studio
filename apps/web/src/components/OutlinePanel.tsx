@@ -15,6 +15,7 @@ import { matchesEndpointFilter } from '../lib/endpoint-outline';
 import { NavGroup, NavItem } from './outline/nav';
 import { OpGroup, OpRows, type RowHandlers } from './outline/OperationRows';
 import { SchemaSection } from './outline/SchemaSection';
+import { cloneNode } from '../lib/clone';
 
 type Doc = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -133,7 +134,7 @@ export function OutlinePanel({
     updateDoc((d) => {
       let i = 2;
       while (d.paths?.[np]) np = `${p}-copy-${i++}`;
-      const copy = structuredClone(d.paths[p][m]);
+      const copy = cloneNode(d.paths[p][m]);
       // A copy is a new operation. Carrying the original's id would point both at one set of
       // mocks and one stage until the next save broke the tie for them.
       delete copy[OP_ID_KEY];
