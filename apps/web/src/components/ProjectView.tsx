@@ -84,8 +84,19 @@ export function ProjectView({
     if (file.doc) setLastDoc(file.doc);
   }, [file.doc]);
   // Deferred: a keystroke in the form commits first, and the outline and the palette — which walk
-  // every operation — re-render in a low-priority pass that a next keystroke can interrupt.
-  const doc = useDeferredValue(file.mode === 'doc' ? file.doc : (parsed ?? lastDoc));
+  // every operation — re-render in a low-priority pass that a next keystroke can interrupt. Not
+  // for the outline's own edits: a drop shown against the old order for a frame is a visible jump.
+  const liveDoc = file.mode === 'doc' ? file.doc : (parsed ?? lastDoc);
+  const deferredDoc = useDeferredValue(liveDoc);
+  const [outlineEdit, setOutlineEdit] = useState(false);
+  useEffect(() => {
+    if (deferredDoc === liveDoc) setOutlineEdit(false);
+  }, [deferredDoc, liveDoc]);
+  const doc = outlineEdit ? liveDoc : deferredDoc;
+  const updateFromOutline = (mutate: (d: Doc) => void) => {
+    setOutlineEdit(true);
+    file.update(mutate);
+  };
 
   useRevisit(file.sync);
 
@@ -287,7 +298,7 @@ export function ProjectView({
                         doc={doc}
                         selection={selection}
                         onSelect={select}
-                        updateDoc={file.update}
+                        updateDoc={updateFromOutline}
                         graph={graph}
                         files={files}
                         activePath={activePath}
