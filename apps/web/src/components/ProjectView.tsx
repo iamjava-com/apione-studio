@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Group, Panel, type GroupImperativeHandle } from 'react-resizable-panels';
 import { Clock, Settings, X } from 'lucide-react';
@@ -78,7 +78,9 @@ export function ProjectView({
   // debounced, in a worker, so it trails typing by a beat. In doc mode the live doc is read
   // directly and the worker gets nothing to do.
   const parsed = useParsedDoc<Doc>(useDebounced(file.mode === 'text' ? file.text : '', 200));
-  const doc = file.mode === 'doc' ? file.doc : parsed;
+  // Deferred: a keystroke in the form commits first, and the outline and the palette — which walk
+  // every operation — re-render in a low-priority pass that a next keystroke can interrupt.
+  const doc = useDeferredValue(file.mode === 'doc' ? file.doc : parsed);
 
   useRevisit(file.sync);
 
