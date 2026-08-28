@@ -1,7 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Group, Panel, type GroupImperativeHandle } from 'react-resizable-panels';
-import YAML from 'yaml';
 import { Clock, Settings, X } from 'lucide-react';
 import { api, type Permission, type Project } from '../api';
 import { useSpecFile } from '../hooks/useSpecFile';
@@ -59,7 +58,6 @@ export function ProjectView({
   const [activePath, setActivePath] = useState('openapi.yaml');
   // Bumped on every server-side write; Scalar takes the spec at mount only, so remount it.
   const [specRev, setSpecRev] = useState(0);
-  const [docRevision, setDocRevision] = useState(0); // bumped when the sidebar edits the live doc
   const [tool, setTool] = useState<Tool | null>(null); // right inspect panel; null = collapsed
   const [historyFocus, setHistoryFocus] = useState<{ base: number; target: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -76,9 +74,11 @@ export function ProjectView({
 
   // The one live spec file, shared by the editor and the sidebar outline.
   const file = useSpecFile(project.id, activePath, onSaved, project.name);
-  // Everything derived from `doc` (outline, palette entries) is too expensive per keystroke, so it
-  // trails the editor by a beat. The editor and the save path read file.content directly.
-  const doc = useParsedDoc<Doc>(useDebounced(file.content, 200));
+  // In text mode the outline and the palette need their own parse of what the YAML editor holds;
+  // debounced, in a worker, so it trails typing by a beat. In doc mode the live doc is read
+  // directly and the worker gets nothing to do.
+  const parsed = useParsedDoc<Doc>(useDebounced(file.mode === 'text' ? file.text : '', 200));
+  const doc = file.mode === 'doc' ? file.doc : parsed;
 
   useRevisit(file.sync);
 
@@ -213,21 +213,6 @@ export function ProjectView({
     refresh();
   };
 
-  // Sidebar edits the live doc (unsaved, like the form); bump docRevision so the form re-syncs.
-  // Parses file.content afresh — the shared `doc` trails the editor, and mutating a stale clone
-  // would silently revert the last keystrokes.
-  const updateDoc = (mutator: (d: Doc) => void) => {
-    let next: Doc;
-    try {
-      next = (YAML.parse(file.content) as Doc) ?? {};
-    } catch {
-      return;
-    }
-    mutator(next);
-    file.setContent(YAML.stringify(next));
-    setDocRevision((r) => r + 1);
-  };
-
   // Design and Mock share the operation selection, so they sit next to each other; Docs renders
   // the whole spec and takes no selection, which makes it the natural end of the row.
   const modes: { id: Mode; label: string }[] = [
@@ -295,7 +280,7 @@ export function ProjectView({
                         doc={doc}
                         selection={selection}
                         onSelect={select}
-                        updateDoc={updateDoc}
+                        updateDoc={file.update}
                         graph={graph}
                         files={files}
                         activePath={activePath}
@@ -311,7 +296,6 @@ export function ProjectView({
                           project={project}
                           file={file}
                           lint={lint}
-                          docRevision={docRevision}
                           selection={selection}
                           onSelect={select}
                           onViewDiff={viewConflictDiff}

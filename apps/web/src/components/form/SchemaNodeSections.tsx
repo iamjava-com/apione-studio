@@ -8,6 +8,7 @@ import { SortableList, Sortable, DragHandle } from './Sortable';
 import { moveKey, insertAfterKey, renameKey, uniqueKey } from './reorder';
 import { SchemaNode } from './SchemaNode';
 import type { Doc } from './types';
+import { cloneNode } from '../../lib/clone';
 
 /** The child sections SchemaNode renders below its header row. Split out for file size only —
  *  they are SchemaNode's flesh, mutually recursive with it, and have no other callers. */
@@ -166,7 +167,7 @@ export function ObjectPropertiesEditor({
   const duplicateField = (f: string) =>
     mutate((n) => {
       const key = uniqueKey(Object.keys(n.properties), f);
-      n.properties = insertAfterKey(n.properties, f, key, structuredClone(n.properties[f]));
+      n.properties = insertAfterKey(n.properties, f, key, cloneNode(n.properties[f]));
     });
 
   return (

@@ -8,6 +8,7 @@ import { selectCls } from './constants';
 import { primaryType, isNullable } from './schema-type';
 import { useRowIds } from '../../hooks/useRowIds';
 import type { Doc, UpdateFn } from './types';
+import { cloneNode } from '../../lib/clone';
 
 const PARAM_TYPES = ['string', 'integer', 'number', 'boolean'];
 // Ordered the way a request reads: URL first (path → query), then transport (header → cookie).
@@ -58,7 +59,7 @@ export function ParametersEditor({ p, m, op, update }: { p: string; m: string; o
     });
   const duplicateParam = (i: number) =>
     mutateParams((a) => {
-      const clone = structuredClone(a[i]);
+      const clone = cloneNode(a[i]);
       clone.name = `${clone.name ?? 'param'}Copy`;
       a.splice(i + 1, 0, clone);
     });

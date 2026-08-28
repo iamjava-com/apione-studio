@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import YAML from 'yaml';
 import type { SpecFile } from '../hooks/useSpecFile';
 import { InfoSection } from './form/InfoSection';
 import { OperationCard } from './form/OperationCard';
@@ -27,52 +25,28 @@ function collectOpKeys(doc: Doc): Set<string> {
 
 /**
  * Master-detail editor: renders only the item chosen in the outline (Info, one
- * operation, or one schema). Edits a parsed copy of the spec and writes it back
- * as YAML — two-way with the YAML view, persisted via the same save path.
+ * operation, or one schema). Edits go through `file.update` on the parsed document;
+ * the YAML view sees them when it is switched to, and the save path serializes once.
  */
 export function FormView({
   file,
-  docRevision,
   selection,
   onSelect,
 }: {
   file: SpecFile;
-  docRevision?: number;
   selection: Selection;
   onSelect: (s: Selection) => void;
 }) {
   const { t } = useTranslation();
-  const [doc, setDoc] = useState<Doc | null>(null);
-  const [parseError, setParseError] = useState(false);
-
-  // Re-parse on (re)load, when the outline edits the doc (docRevision bump), and when the
-  // content is swapped wholesale (reset/restore → file.syncRev). The form's own edits bump
-  // none of these, so typing never triggers a re-parse.
-  useEffect(() => {
-    if (!file.loaded) return;
-    try {
-      setDoc(YAML.parse(file.content) ?? {});
-      setParseError(false);
-    } catch {
-      setParseError(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file.loaded, docRevision, file.syncRev]);
 
   if (!file.loaded) return null; // loading (or switching files) — no stale form, no flash
-  if (parseError) {
+  // Only ever after the YAML view was left holding text that does not parse: the mode stays text.
+  if (file.mode !== 'doc') {
     return <div className="p-4 text-[14px] text-muted">{t('formUnavailable')}</div>;
   }
-  // loaded, parse ok, but the effect hasn't set doc for this frame yet — render blank
-  // rather than flashing the "unparseable" notice for one frame (effect runs post-render).
+  const doc = file.doc;
   if (!doc) return null;
-
-  const update: UpdateFn = (mutate) => {
-    const next = structuredClone(doc);
-    mutate(next);
-    setDoc(next);
-    file.setContent(YAML.stringify(next));
-  };
+  const update: UpdateFn = file.update;
 
   const schemaNames = Object.keys(doc.components?.schemas ?? {});
 
