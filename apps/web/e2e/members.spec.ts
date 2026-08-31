@@ -21,6 +21,8 @@ test('a read-only member has no design tab and lands on the visible settings sec
   // Add-member is a searchable user picker (combobox); role defaults to viewer.
   await dlg.getByLabel('Select a user').click();
   await dlg.getByLabel('Select a user-search').fill(viewer);
+  // The list is fetched; Enter before it lands selects nothing.
+  await expect(page.getByRole('button', { name: viewer, exact: true })).toBeVisible();
   await dlg.getByLabel('Select a user-search').press('Enter');
   await dlg.getByRole('button', { name: 'Add' }).click();
   await expect(dlg.getByText(viewer, { exact: true })).toBeVisible();
@@ -84,6 +86,8 @@ test('an admin who owns a project can still leave it', async ({ page }) => {
   await dlg.getByRole('button', { name: 'Members' }).click();
   await dlg.getByLabel('Select a user').click();
   await dlg.getByLabel('Select a user-search').fill(mate);
+  // The list is fetched; Enter before it lands selects nothing.
+  await expect(page.getByRole('button', { name: mate, exact: true })).toBeVisible();
   await dlg.getByLabel('Select a user-search').press('Enter');
   await dlg.getByLabel('Role', { exact: true }).selectOption('owner');
   await dlg.getByRole('button', { name: 'Add' }).click();
@@ -108,6 +112,8 @@ test('an admin who owns a project can still leave it', async ({ page }) => {
   await after.getByRole('button', { name: 'Members' }).click();
   await after.getByLabel('Select a user').click();
   await after.getByLabel('Select a user-search').fill('admin');
+  // The list is fetched; Enter before it lands selects nothing.
+  await expect(page.getByRole('button', { name: 'admin', exact: true })).toBeVisible();
   await after.getByLabel('Select a user-search').press('Enter');
   await after.getByRole('button', { name: 'Add' }).click();
   await expect(after.getByText('admin', { exact: true })).toBeVisible();
