@@ -1,7 +1,7 @@
 {
   "name": "apione-studio",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "OpenAPI-first API studio — file-as-truth, self-hosted.",
   "license": "MIT",
   "engines": {
