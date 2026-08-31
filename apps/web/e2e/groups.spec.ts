@@ -119,6 +119,8 @@ test('members can be imported wholesale from another project', async ({ page }) 
   await srcDlg.getByRole('button', { name: 'Members' }).click();
   await srcDlg.getByLabel('Select a user').click();
   await srcDlg.getByLabel('Select a user-search').fill(helper);
+  // The list is fetched; Enter before it lands selects nothing.
+  await expect(page.getByRole('button', { name: helper, exact: true })).toBeVisible();
   await srcDlg.getByLabel('Select a user-search').press('Enter');
   await srcDlg.getByRole('combobox').first().selectOption('editor');
   await srcDlg.getByRole('button', { name: 'Add' }).click();

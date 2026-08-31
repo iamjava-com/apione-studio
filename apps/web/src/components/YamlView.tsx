@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import YAML from 'yaml';
 import '../monaco-setup'; // configures Monaco on import; this view is where that cost belongs
 import { EDITOR_FONT } from '../lib/editor-font';
 import { useTheme } from '../theme';
 import type { SpecFile } from '../hooks/useSpecFile';
+import { EditorPlaceholder } from './ui/editor-placeholder';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type RevealTarget = { kind: 'op'; method: string; path: string } | { kind: 'schema'; name: string };
@@ -33,6 +34,9 @@ function keyOffset(text: string, target: RevealTarget): number | null {
 export function YamlView({ file }: { file: SpecFile }) {
   const { theme } = useTheme();
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  // Creating the editor blocks the main thread for as long as the model takes to build; the
+  // overlay is what is on screen meanwhile, instead of an empty pane.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const ed = editorRef.current;
@@ -63,19 +67,26 @@ export function YamlView({ file }: { file: SpecFile }) {
   }, []);
 
   return (
-    <Editor
-      height="100%"
-      theme={`apione-${theme}`}
-      language="yaml"
-      defaultValue={file.text}
-      onChange={(v) => file.setText(v ?? '')}
-      onMount={(ed) => (editorRef.current = ed)}
-      options={{
-        minimap: { enabled: false },
-        fontSize: 13,
-        tabSize: 2,
-        fontFamily: EDITOR_FONT,
-      }}
-    />
+    <div className="relative h-full">
+      <Editor
+        height="100%"
+        theme={`apione-${theme}`}
+        language="yaml"
+        defaultValue={file.text}
+        onChange={(v) => file.setText(v ?? '')}
+        onMount={(ed) => {
+          editorRef.current = ed;
+          setReady(true);
+        }}
+        loading={null}
+        options={{
+          minimap: { enabled: false },
+          fontSize: 13,
+          tabSize: 2,
+          fontFamily: EDITOR_FONT,
+        }}
+      />
+      {!ready && <EditorPlaceholder />}
+    </div>
   );
 }
