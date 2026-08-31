@@ -13,12 +13,9 @@
 
 ### Bug Fixes
 
-* a dropped outline row jumps back for a frame before settling ([#11](https://github.com/iamjava-com/apione-studio/issues/11)) ([ace1162](https://github.com/iamjava-com/apione-studio/commit/ace1162ce7b4be99e94b05d90362a97ff14b08a5))
-* a dropped outline row replays its move ([#13](https://github.com/iamjava-com/apione-studio/issues/13)) ([84e2365](https://github.com/iamjava-com/apione-studio/commit/84e2365f38b710f20c49e52b0551bdb49c8c73d8))
 * form typing and outline drags stutter on large specs ([#4](https://github.com/iamjava-com/apione-studio/issues/4)) ([f57a6cb](https://github.com/iamjava-com/apione-studio/commit/f57a6cb3f8740e817e966692f9b01ef8500ead30))
 * switching to the YAML view blanks the pane ([#14](https://github.com/iamjava-com/apione-studio/issues/14)) ([9f252b8](https://github.com/iamjava-com/apione-studio/commit/9f252b871c2265293026f4df18f6ff664b41d206))
 * the outline blanks for a moment when switching to the YAML view ([#10](https://github.com/iamjava-com/apione-studio/issues/10)) ([c5d4bd1](https://github.com/iamjava-com/apione-studio/commit/c5d4bd13a1287b389bbf5f5726d48bf15e3e44aa))
-* the outline lags a keystroke behind the form instead of blocking it ([#7](https://github.com/iamjava-com/apione-studio/issues/7)) ([a9700d2](https://github.com/iamjava-com/apione-studio/commit/a9700d22e525723bafec4ae17cc892b95238d8da))
 
 ## [1.0.4](https://github.com/iamjava-com/apione-studio/compare/v1.0.3...v1.0.4) (2026-08-28)
 
