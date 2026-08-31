@@ -6,9 +6,12 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { FormView } from './FormView';
 // Monaco is several megabytes and the form is the default view, so the login screen and the form
-// should not carry it. It arrives when someone actually switches to YAML.
-const YamlView = lazy(() => import('./YamlView').then((m) => ({ default: m.YamlView })));
+// should not carry it. Pointing at the YAML toggle starts the fetch, so the click that follows
+// rarely waits for the chunk.
+const loadYamlView = () => import('./YamlView');
+const YamlView = lazy(() => loadYamlView().then((m) => ({ default: m.YamlView })));
 import { LintStatus } from './LintStatus';
+import { EditorPlaceholder } from './ui/editor-placeholder';
 import { useConfirm } from './ConfirmProvider';
 import type { Selection } from './form/types';
 import { PendingEditsProvider } from './form/PendingEdits';
@@ -38,6 +41,7 @@ export function SpecEditor({
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [view, setView] = useState<View>('form');
+  const [yamlOpened, setYamlOpened] = useState(false);
   const [pendingEdits, setPendingEdits] = useState(0);
 
   // Blurring commits whatever field has focus, and that commit reaches the file synchronously, so
@@ -79,10 +83,13 @@ export function SpecEditor({
           {(['form', 'yaml'] as const).map((v) => (
             <button
               key={v}
+              onPointerEnter={v === 'yaml' ? () => void loadYamlView() : undefined}
+              onFocus={v === 'yaml' ? () => void loadYamlView() : undefined}
               onClick={() => {
                 // Form over text that does not parse stays in text mode and says so (FormView).
                 file.switchMode(v === 'form' ? 'doc' : 'text');
                 setView(v);
+                if (v === 'yaml') setYamlOpened(true);
               }}
               className={cn(
                 'rounded px-2 py-0.5 text-[13px] transition-colors',
@@ -128,14 +135,19 @@ export function SpecEditor({
       )}
 
       <div className="min-h-0 flex-1">
-        {view === 'yaml' ? (
-          <Suspense fallback={<div className="h-full" />}>
-            <YamlView file={file} />
-          </Suspense>
-        ) : (
+        {view === 'form' && (
           <PendingEditsProvider onChange={(d) => setPendingEdits((n) => Math.max(0, n + d))}>
             <FormView file={file} selection={selection} onSelect={onSelect} />
           </PendingEditsProvider>
+        )}
+        {/* Once opened, the YAML editor stays mounted and is only hidden: building a Monaco model
+            for a large document takes hundreds of milliseconds, and that is paid once. */}
+        {yamlOpened && (
+          <div className={cn('relative h-full', view !== 'yaml' && 'hidden')}>
+            <Suspense fallback={<EditorPlaceholder />}>
+              <YamlView file={file} />
+            </Suspense>
+          </div>
         )}
       </div>
     </div>
