@@ -19,8 +19,9 @@ test('history lists the endpoint a save added, and can switch to the text diff',
   await expect(row).toBeVisible();
   await expect(row).toContainText(msg('changeAdded'));
   await row.click();
-  await expect(page.getByText('endpoint-added')).toBeVisible();
-  // ...and a diff of just that endpoint: its lines, none of the rest of the file.
+  // An addition breaks nobody; what shows is the diff of just that endpoint — its lines, none of
+  // the rest of the file — under the no-breaking line.
+  await expect(page.getByText(msg('breakingNone')).first()).toBeVisible();
   await expect(page.getByText('responses:').first()).toBeVisible();
   await expect(page.getByText('/hello:')).toHaveCount(0);
 
@@ -29,4 +30,26 @@ test('history lists the endpoint a save added, and can switch to the text diff',
   await expect(page.getByText('/orders:').first()).toBeVisible();
   await page.getByRole('button', { name: msg('showChanges') }).click();
   await expect(row).toBeVisible();
+});
+
+// Deleting an endpoint is a breaking change: its row opens to the error count, and the count
+// floats oasdiff's own words.
+test('a removed endpoint opens to its breaking summary', async ({ page }) => {
+  await authenticate(page);
+  await createProject(page, `Removed ${Date.now()}`);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(msg('saved', { version: 1 }))).toBeVisible();
+
+  await page.getByRole('group', { name: 'path-/hello' }).hover();
+  await page.getByLabel('delete-op').click();
+  await page.getByLabel('confirm-ok').click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(msg('saved', { version: 2 }))).toBeVisible();
+
+  await page.getByLabel('tool-history').click();
+  const row = page.getByLabel('change-GET /hello');
+  await expect(row).toContainText(msg('changeRemoved'));
+  await row.click();
+  await page.getByRole('button', { name: msg('errors', { count: 1 }), exact: false }).click();
+  await expect(page.getByText('api path removed', { exact: false })).toBeVisible();
 });
