@@ -104,6 +104,12 @@ export function useSpecFile(projectId: string, path: string, onSaved?: () => voi
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [conflict, setConflict] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 'saved' is a receipt, not a state: it clears itself (matching the chip's fade) or on the next edit.
+  useEffect(() => {
+    if (status !== 'saved') return;
+    const t = window.setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 2000);
+    return () => window.clearTimeout(t);
+  }, [status]);
   const [syncRev, setSyncRev] = useState(0);
 
   const isDirty = useCallback(() => {

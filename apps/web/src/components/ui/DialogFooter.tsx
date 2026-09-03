@@ -6,11 +6,14 @@ export function DialogFooter({
   onCancel,
   confirmLabel,
   disabled,
+  busy,
   onConfirm,
 }: {
   onCancel: () => void;
   confirmLabel: string;
   disabled?: boolean;
+  /** The confirm action is in flight; cancel stays live. */
+  busy?: boolean;
   onConfirm: () => void;
 }) {
   const { t } = useTranslation();
@@ -19,7 +22,7 @@ export function DialogFooter({
       <Button variant="ghost" size="sm" onClick={onCancel}>
         {t('cancel')}
       </Button>
-      <Button variant="brand" size="sm" disabled={disabled} onClick={onConfirm}>
+      <Button variant="brand" size="sm" disabled={disabled} busy={busy} onClick={onConfirm}>
         {confirmLabel}
       </Button>
     </div>

@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Group, Project } from '../../api';
 import { cn } from '../../lib/utils';
+import { Spinner } from '../ui/spinner';
 import { ProjectCard } from './ProjectCard';
 
 /**
@@ -21,7 +22,7 @@ export function GroupSection({
   collapsed,
   dragging,
   isAdmin,
-  duplicatingId,
+  busy,
   onOpen,
   onDuplicate,
   onNewProject,
@@ -34,7 +35,8 @@ export function GroupSection({
   collapsed: boolean;
   dragging: boolean;
   isAdmin: boolean;
-  duplicatingId: string | null;
+  /** The list's in-flight action (`dup:<projectId>` / `del:<groupId>`), or null. */
+  busy: string | null;
   onOpen: (p: Project) => void;
   onDuplicate: (p: Project) => void;
   onNewProject: () => void;
@@ -94,9 +96,11 @@ export function GroupSection({
                 aria-label={`${t('deleteGroup')}: ${group.name}`}
                 title={t('deleteGroup')}
                 onClick={onDelete}
-                className={cn(iconBtn, 'hover:text-delete')}
+                disabled={!!busy}
+                aria-busy={busy === `del:${group.id}` || undefined}
+                className={cn(iconBtn, 'hover:text-delete', busy === `del:${group.id}` && 'opacity-100')}
               >
-                <Trash2 size={13} />
+                {busy === `del:${group.id}` ? <Spinner size={13} /> : <Trash2 size={13} />}
               </button>
             </>
           )}
@@ -112,7 +116,8 @@ export function GroupSection({
               key={p.id}
               project={p}
               canMove={isAdmin || p.myRole === 'owner'}
-              duplicating={duplicatingId === p.id}
+              duplicating={busy === `dup:${p.id}`}
+              locked={!!busy}
               onOpen={onOpen}
               onDuplicate={onDuplicate}
             />

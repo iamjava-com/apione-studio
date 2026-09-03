@@ -170,8 +170,8 @@ export function MockDebugPanel({
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-[13px] text-muted">
         <span>{t('mockDebug')}</span>
         <div className="flex-1" />
-        <Button size="sm" disabled={!method || running} onClick={() => void run()}>
-          <Play size={13} />
+        <Button size="sm" disabled={!method} busy={running} onClick={() => void run()}>
+          {!running && <Play size={13} />}
           {dirty ? t('mockSaveAndRun') : t('mockRun')}
         </Button>
       </div>

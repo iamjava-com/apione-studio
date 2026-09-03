@@ -16,6 +16,8 @@ import { NavGroup, NavItem } from './outline/nav';
 import { OpGroup, OpRows, type RowHandlers } from './outline/OperationRows';
 import { SchemaSection } from './outline/SchemaSection';
 import { cloneNode } from '../lib/clone';
+import { Spinner } from './ui/spinner';
+import { SkeletonRows } from './ui/skeleton';
 
 type Doc = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -39,6 +41,7 @@ export function OutlinePanel({
   activePath,
   onSelectFile,
   onDeleteFile,
+  deletingPath = null,
 }: {
   doc: Doc | null;
   selection: Selection;
@@ -49,6 +52,8 @@ export function OutlinePanel({
   activePath: string;
   onSelectFile: (path: string) => void;
   onDeleteFile: (path: string) => void;
+  /** The file whose delete is in flight; the other rows' delete waits. */
+  deletingPath?: string | null;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -204,13 +209,15 @@ export function OutlinePanel({
                 <span className="font-mono text-[11px] text-faint">v{f.currentVersion}</span>
                 <button
                   aria-label={t('delete')}
-                  className="text-faint hover:text-delete"
+                  disabled={deletingPath !== null}
+                  aria-busy={deletingPath === f.path || undefined}
+                  className="text-faint hover:text-delete disabled:pointer-events-none"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteFile(f.path);
                   }}
                 >
-                  ✕
+                  {deletingPath === f.path ? <Spinner size={12} /> : '✕'}
                 </button>
               </NavItem>
             ))}
@@ -231,84 +238,91 @@ export function OutlinePanel({
           </button>
         </div>
 
-        <NavGroup
-          label={t('operations')}
-          action={
-            <div className="flex items-center gap-1">
-              {dnd.grouped && (
-                <button
-                  aria-label={allCollapsed ? 'expand-all-groups' : 'collapse-all-groups'}
-                  title={allCollapsed ? t('expandAll') : t('collapseAll')}
-                  className="text-faint hover:text-text"
-                  onClick={toggleAllGroups}
-                >
-                  {allCollapsed ? <ChevronsUpDown size={13} /> : <ChevronsDownUp size={13} />}
-                </button>
-              )}
-              <button aria-label="add-endpoint" className="text-faint hover:text-text" onClick={addEndpoint}>
-                <Plus size={14} />
-              </button>
-            </div>
-          }
-        >
-          {shownOps.length === 0 && <p className="px-3 text-[13px] text-faint">{q ? t('cmdkEmpty') : '—'}</p>}
-          {/* One DndContext spans every group (multi-container sortable), so dragging across a
-              boundary re-tags. Groups force-open during a drag and while filtering, or a row
-              lands behind a collapse. */}
-          <DndContext sensors={dnd.sensors} collisionDetection={dnd.collisionDetection} {...dnd.dragHandlers}>
-            {dnd.grouped ? (
-              dnd.renderGroups
-                .filter((g) => !q || g.ids.length > 0)
-                .map((g) => (
-                  <OpGroup
-                    key={g.tag}
-                    group={{ tag: g.tag, ops: g.ids.map((id) => dnd.opById.get(id)).filter((o): o is Op => !!o) }}
-                    collapsed={!dnd.draggingId && !q && collapsedGroups.has(g.tag)}
-                    onToggle={() => toggleGroup(g.tag)}
-                    selection={selection}
-                    untaggedLabel={t('untagged')}
-                    on={rowHandlers}
-                  />
-                ))
-            ) : (
-              <OpRows ops={dnd.renderOps} selection={selection} on={rowHandlers} />
-            )}
-            {/* floating copy under the cursor; it names the path when the whole block travels */}
-            <DragOverlay dropAnimation={null}>
-              {dnd.draggingOp ? (
-                <div className="flex items-center gap-1.5 rounded bg-raised px-2 py-1 shadow-lg ring-1 ring-brand">
-                  {dnd.travellingPath ? (
-                    <span className="truncate font-mono text-[13px] text-text">
-                      {t('dragPathBlock', { p: dnd.travellingPath, n: dnd.travellingCount })}
-                    </span>
-                  ) : (
-                    <>
-                      <MethodBadge method={dnd.draggingOp.m} />
-                      <span
-                        className={cn(
-                          'truncate text-[13px]',
-                          dnd.draggingOp.summary ? 'text-text' : 'font-mono text-muted',
-                        )}
-                      >
-                        {dnd.draggingOp.summary || dnd.draggingOp.p}
-                      </span>
-                    </>
+        {/* No document yet means the read is still out; empty groups would say the spec is empty. */}
+        {doc === null ? (
+          <SkeletonRows rows={6} height="h-6" className="px-2 py-1" />
+        ) : (
+          <>
+            <NavGroup
+              label={t('operations')}
+              action={
+                <div className="flex items-center gap-1">
+                  {dnd.grouped && (
+                    <button
+                      aria-label={allCollapsed ? 'expand-all-groups' : 'collapse-all-groups'}
+                      title={allCollapsed ? t('expandAll') : t('collapseAll')}
+                      className="text-faint hover:text-text"
+                      onClick={toggleAllGroups}
+                    >
+                      {allCollapsed ? <ChevronsUpDown size={13} /> : <ChevronsDownUp size={13} />}
+                    </button>
                   )}
+                  <button aria-label="add-endpoint" className="text-faint hover:text-text" onClick={addEndpoint}>
+                    <Plus size={14} />
+                  </button>
                 </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        </NavGroup>
+              }
+            >
+              {shownOps.length === 0 && <p className="px-3 text-[13px] text-faint">{q ? t('cmdkEmpty') : '—'}</p>}
+              {/* One DndContext spans every group (multi-container sortable), so dragging across a
+                boundary re-tags. Groups force-open during a drag and while filtering, or a row
+                lands behind a collapse. */}
+              <DndContext sensors={dnd.sensors} collisionDetection={dnd.collisionDetection} {...dnd.dragHandlers}>
+                {dnd.grouped ? (
+                  dnd.renderGroups
+                    .filter((g) => !q || g.ids.length > 0)
+                    .map((g) => (
+                      <OpGroup
+                        key={g.tag}
+                        group={{ tag: g.tag, ops: g.ids.map((id) => dnd.opById.get(id)).filter((o): o is Op => !!o) }}
+                        collapsed={!dnd.draggingId && !q && collapsedGroups.has(g.tag)}
+                        onToggle={() => toggleGroup(g.tag)}
+                        selection={selection}
+                        untaggedLabel={t('untagged')}
+                        on={rowHandlers}
+                      />
+                    ))
+                ) : (
+                  <OpRows ops={dnd.renderOps} selection={selection} on={rowHandlers} />
+                )}
+                {/* floating copy under the cursor; it names the path when the whole block travels */}
+                <DragOverlay dropAnimation={null}>
+                  {dnd.draggingOp ? (
+                    <div className="flex items-center gap-1.5 rounded bg-raised px-2 py-1 shadow-lg ring-1 ring-brand">
+                      {dnd.travellingPath ? (
+                        <span className="truncate font-mono text-[13px] text-text">
+                          {t('dragPathBlock', { p: dnd.travellingPath, n: dnd.travellingCount })}
+                        </span>
+                      ) : (
+                        <>
+                          <MethodBadge method={dnd.draggingOp.m} />
+                          <span
+                            className={cn(
+                              'truncate text-[13px]',
+                              dnd.draggingOp.summary ? 'text-text' : 'font-mono text-muted',
+                            )}
+                          >
+                            {dnd.draggingOp.summary || dnd.draggingOp.p}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </NavGroup>
 
-        <SchemaSection
-          names={shownSchemas}
-          doc={doc}
-          graph={graph}
-          selection={selection}
-          onSelect={onSelect}
-          updateDoc={updateDoc}
-          emptyLabel={q ? t('cmdkEmpty') : '—'}
-        />
+            <SchemaSection
+              names={shownSchemas}
+              doc={doc}
+              graph={graph}
+              selection={selection}
+              onSelect={onSelect}
+              updateDoc={updateDoc}
+              emptyLabel={q ? t('cmdkEmpty') : '—'}
+            />
+          </>
+        )}
       </div>
     </div>
   );

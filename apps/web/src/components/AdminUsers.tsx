@@ -7,12 +7,15 @@ import { formatDate } from '../lib/format';
 import { cn } from '../lib/utils';
 import { useConfirm } from './ConfirmProvider';
 import { useDialogForm } from '../hooks/useDialogForm';
+import { useBusy } from '../hooks/useBusy';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog } from './ui/dialog';
 import { CopyButton } from './ui/CopyButton';
 import { DialogFooter } from './ui/DialogFooter';
 import { ErrorText } from './ui/ErrorText';
+import { Spinner } from './ui/spinner';
+import { SkeletonRows } from './ui/skeleton';
 import { selectCls as baseSelect } from './ui/select';
 
 const selectCls = cn(baseSelect, 'h-7'); // compact for table rows
@@ -23,7 +26,8 @@ const selectCls = cn(baseSelect, 'h-7'); // compact for table rows
 export function AdminUsers({ meId }: { meId: string }) {
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const act = useBusy();
   const [error, setError] = useState<string | null>(null);
 
   const [creating, setCreating] = useState(false);
@@ -38,17 +42,19 @@ export function AdminUsers({ meId }: { meId: string }) {
   useEffect(refresh, []);
 
   // Any mutation shares one error surface; refresh on success.
-  const run = async (fn: () => Promise<unknown>) => {
-    setError(null);
-    try {
-      await fn();
-      refresh();
-    } catch (e) {
-      setError(errorText(e));
-    }
-  };
+  const mutate = (key: string, fn: () => Promise<unknown>) =>
+    act.run(key, async () => {
+      setError(null);
+      try {
+        await fn();
+        refresh();
+      } catch (e) {
+        setError(errorText(e));
+      }
+    });
 
-  const setRole = (u: AdminUser, role: 'admin' | 'member') => run(() => api.adminUpdateUser(u.id, { role }));
+  const setRole = (u: AdminUser, role: 'admin' | 'member') =>
+    mutate(`role:${u.id}`, () => api.adminUpdateUser(u.id, { role }));
 
   // Disabling signs the user out immediately, so confirm it; enabling is harmless and stays instant.
   const toggleStatus = async (u: AdminUser) => {
@@ -57,7 +63,9 @@ export function AdminUsers({ meId }: { meId: string }) {
       !(await confirm({ message: t('confirmDisableUser', { name: u.username }), confirmLabel: t('disable') }))
     )
       return;
-    void run(() => api.adminUpdateUser(u.id, { status: u.status === 'active' ? 'disabled' : 'active' }));
+    void mutate(`status:${u.id}`, () =>
+      api.adminUpdateUser(u.id, { status: u.status === 'active' ? 'disabled' : 'active' }),
+    );
   };
 
   const resetPw = async (u: AdminUser) => {
@@ -68,13 +76,15 @@ export function AdminUsers({ meId }: { meId: string }) {
       }))
     )
       return;
-    setError(null);
-    try {
-      const { password } = await api.adminResetPassword(u.id);
-      setIssued({ username: u.username, password });
-    } catch (e) {
-      setError(errorText(e));
-    }
+    await act.run(`reset:${u.id}`, async () => {
+      setError(null);
+      try {
+        const { password } = await api.adminResetPassword(u.id);
+        setIssued({ username: u.username, password });
+      } catch (e) {
+        setError(errorText(e));
+      }
+    });
   };
 
   const remove = async (u: AdminUser) => {
@@ -86,7 +96,7 @@ export function AdminUsers({ meId }: { meId: string }) {
       }))
     )
       return;
-    void run(() => api.adminDeleteUser(u.id));
+    void mutate(`del:${u.id}`, () => api.adminDeleteUser(u.id));
   };
 
   return (
@@ -115,7 +125,14 @@ export function AdminUsers({ meId }: { meId: string }) {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => {
+            {users === null && (
+              <tr>
+                <td colSpan={5} className="px-3 py-2">
+                  <SkeletonRows rows={3} height="h-7" />
+                </td>
+              </tr>
+            )}
+            {(users ?? []).map((u) => {
               const isSelf = u.id === meId;
               const disabled = u.status === 'disabled';
               return (
@@ -129,8 +146,8 @@ export function AdminUsers({ meId }: { meId: string }) {
                       aria-label={`role-${u.username}`}
                       className={selectCls}
                       value={u.role}
-                      disabled={isSelf}
-                      onChange={(e) => setRole(u, e.target.value as 'admin' | 'member')}
+                      disabled={isSelf || act.locked}
+                      onChange={(e) => void setRole(u, e.target.value as 'admin' | 'member')}
                     >
                       <option value="admin">{t('roleAdmin')}</option>
                       <option value="member">{t('roleMember')}</option>
@@ -148,27 +165,43 @@ export function AdminUsers({ meId }: { meId: string }) {
                         aria-label={`reset-${u.username}`}
                         title={t('resetPassword')}
                         onClick={() => resetPw(u)}
-                        className="rounded p-1 text-faint transition-colors hover:bg-raised hover:text-text"
+                        disabled={act.locked}
+                        aria-busy={act.busy === `reset:${u.id}` || undefined}
+                        className="rounded p-1 text-faint transition-colors hover:bg-raised hover:text-text disabled:pointer-events-none"
                       >
-                        <KeyRound size={14} />
+                        {act.busy === `reset:${u.id}` ? <Spinner /> : <KeyRound size={14} />}
                       </button>
                       <button
                         aria-label={`${disabled ? 'enable' : 'disable'}-${u.username}`}
                         title={disabled ? t('enable') : t('disable')}
-                        disabled={isSelf}
+                        disabled={isSelf || act.locked}
+                        aria-busy={act.busy === `status:${u.id}` || undefined}
                         onClick={() => toggleStatus(u)}
-                        className="rounded p-1 text-faint transition-colors hover:bg-raised hover:text-text disabled:opacity-30 disabled:hover:bg-transparent"
+                        className={cn(
+                          'rounded p-1 text-faint transition-colors hover:bg-raised hover:text-text disabled:opacity-30 disabled:hover:bg-transparent',
+                          act.busy === `status:${u.id}` && 'disabled:opacity-100',
+                        )}
                       >
-                        {disabled ? <Check size={14} /> : <Ban size={14} />}
+                        {act.busy === `status:${u.id}` ? (
+                          <Spinner />
+                        ) : disabled ? (
+                          <Check size={14} />
+                        ) : (
+                          <Ban size={14} />
+                        )}
                       </button>
                       <button
                         aria-label={`delete-${u.username}`}
                         title={t('delete')}
-                        disabled={isSelf}
+                        disabled={isSelf || act.locked}
+                        aria-busy={act.busy === `del:${u.id}` || undefined}
                         onClick={() => remove(u)}
-                        className="rounded p-1 text-faint transition-colors hover:text-delete disabled:opacity-30 disabled:hover:text-faint"
+                        className={cn(
+                          'rounded p-1 text-faint transition-colors hover:text-delete disabled:opacity-30 disabled:hover:text-faint',
+                          act.busy === `del:${u.id}` && 'disabled:opacity-100',
+                        )}
                       >
-                        <Trash2 size={14} />
+                        {act.busy === `del:${u.id}` ? <Spinner /> : <Trash2 size={14} />}
                       </button>
                     </div>
                   </td>
@@ -309,7 +342,8 @@ function CreateUserDialog({
       <DialogFooter
         onCancel={() => onOpenChange(false)}
         confirmLabel={t('create')}
-        disabled={!username.trim() || form.busy}
+        disabled={!username.trim()}
+        busy={form.busy}
         onConfirm={submit}
       />
     </Dialog>
