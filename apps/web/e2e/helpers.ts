@@ -97,3 +97,17 @@ export async function createUserViaDialog(page: Page, username: string, role: 'm
   await page.getByRole('button', { name: 'Done' }).click();
   return pw;
 }
+
+/** A co-author saving the same file: read it over the API, edit it, write it back. The editor
+ * under test never sees this happen — that is the point. */
+export async function otherAuthorWrites(page: Page, projectId: string, edit: (content: string) => string) {
+  const tok = await page.evaluate(() => localStorage.getItem('apione-token'));
+  const headers = { Authorization: `Bearer ${tok}` };
+  const url = `/api/projects/${projectId}/files/openapi.yaml`;
+  const read = await (await page.request.get(url, { headers })).json();
+  const res = await page.request.put(url, {
+    headers,
+    data: { content: edit(read.content), baseVersion: read.version },
+  });
+  expect(res.ok(), await res.text()).toBeTruthy();
+}

@@ -10,6 +10,7 @@ import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { SkeletonRows } from './ui/skeleton';
 import { useBusy } from '../hooks/useBusy';
+import { useResource } from '../hooks/useResource';
 import { Input } from './ui/input';
 import { Dialog } from './ui/dialog';
 import { CopyButton } from './ui/CopyButton';
@@ -20,7 +21,7 @@ import { ErrorText } from './ui/ErrorText';
 export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
-  const [tokens, setTokens] = useState<ApiToken[] | null>(null);
+  const tokens = useResource(() => api.listApiTokens(), [open], { enabled: open, keepPrevious: false });
   const act = useBusy();
   const [name, setName] = useState('');
   const [issued, setIssued] = useState<CreatedApiToken | null>(null);
@@ -28,22 +29,14 @@ export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const form = useDialogForm(open, () => {
     setName('');
     setIssued(null);
-    void refresh();
   });
-
-  function refresh() {
-    return api
-      .listApiTokens()
-      .then(setTokens)
-      .catch((e: unknown) => form.setError(errorText(e)));
-  }
 
   const create = () => {
     if (!name.trim()) return;
     void form.submit(async () => {
       setIssued(await api.createApiToken(name.trim()));
       setName('');
-      await refresh();
+      tokens.reload();
     });
   };
 
@@ -57,14 +50,9 @@ export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenC
     )
       return;
     await act.run(`rm:${tok.id}`, async () => {
-      form.setError(null);
-      try {
-        await api.revokeApiToken(tok.id);
-        if (issued?.id === tok.id) setIssued(null);
-        await refresh();
-      } catch (e) {
-        form.setError(errorText(e));
-      }
+      await api.revokeApiToken(tok.id);
+      if (issued?.id === tok.id) setIssued(null);
+      tokens.reload();
     });
   };
 
@@ -103,12 +91,15 @@ export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenC
         </Button>
       </div>
 
-      <ErrorText error={form.error} className="mt-2" />
+      <ErrorText
+        error={form.error ?? act.error?.text ?? (tokens.error ? errorText(tokens.error) : null)}
+        className="mt-2"
+      />
 
-      {tokens === null && <SkeletonRows rows={2} className="mt-4" />}
-      {tokens && tokens.length > 0 && (
+      {tokens.data === undefined && <SkeletonRows rows={2} className="mt-4" />}
+      {tokens.data && tokens.data.length > 0 && (
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
-          {tokens.map((tok) => (
+          {tokens.data.map((tok) => (
             <li key={tok.id} className="flex items-center gap-3 px-3 py-2">
               <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-text">{tok.name}</span>
               <span className="shrink-0 text-[12px] text-faint">

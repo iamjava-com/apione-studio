@@ -1,19 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { authenticate, createProject, msg } from './helpers';
-
-// A co-author saving the same file: read it over the API, edit it, write it back. The editor
-// under test never sees this happen — that is the point.
-async function otherAuthorWrites(page: Page, projectId: string, edit: (content: string) => string) {
-  const tok = await page.evaluate(() => localStorage.getItem('apione-token'));
-  const headers = { Authorization: `Bearer ${tok}` };
-  const url = `/api/projects/${projectId}/files/openapi.yaml`;
-  const read = await (await page.request.get(url, { headers })).json();
-  const res = await page.request.put(url, {
-    headers,
-    data: { content: edit(read.content), baseVersion: read.version },
-  });
-  expect(res.ok()).toBeTruthy();
-}
+import { authenticate, createProject, msg, otherAuthorWrites } from './helpers';
 
 const otherAuthorAdds = (page: Page, projectId: string, opPath: string) =>
   otherAuthorWrites(page, projectId, (c) =>
