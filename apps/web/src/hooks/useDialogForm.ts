@@ -1,41 +1,34 @@
-import { useEffect, useRef, useState } from 'react';
-import { errorText } from '../lib/errors';
+import { useEffect, useMemo, useRef } from 'react';
+import { useBusy } from './useBusy';
 
 /**
- * The busy/error bookkeeping every modal form repeats.
- *
- * When `open` flips true: busy and error clear, then `reset` runs (the caller's field reset —
- * focus/select scheduling included). `submit(fn)` refuses re-entry while busy, funnels a rejection
- * into `error`, and always releases busy; closing on success is `fn`'s own job.
+ * A modal form's one action, on top of `useBusy`: when `open` flips true the error clears and
+ * `reset` runs (the caller's field reset — focus/select scheduling included). `submit(fn)`
+ * refuses re-entry while busy and funnels a rejection into `error`; closing on success is `fn`'s
+ * own job.
  */
 export function useDialogForm(open: boolean, reset?: () => void) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const act = useBusy();
   // Kept in a ref so the open effect below reads the latest closure without depending on it.
   const resetRef = useRef(reset);
   useEffect(() => {
     resetRef.current = reset;
   });
 
+  const { clearError } = act;
   useEffect(() => {
     if (!open) return;
-    setBusy(false);
-    setError(null);
+    clearError();
     resetRef.current?.();
-  }, [open]);
+  }, [open, clearError]);
 
-  const submit = async (fn: () => Promise<void>) => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await fn();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return { busy, error, setError, submit };
+  return useMemo(
+    () => ({
+      busy: act.locked,
+      error: act.error?.text ?? null,
+      setError: (text: string | null) => (text === null ? act.clearError() : act.fail('form', text)),
+      submit: (fn: () => Promise<void>) => act.run('form', fn),
+    }),
+    [act],
+  );
 }

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiReferenceReact } from '@scalar/api-reference-react';
 import '@scalar/api-reference-react/style.css';
 import { api } from '../api';
+import { useResource } from '../hooks/useResource';
 import { serverBasePaths } from '../lib/base-path';
 import { useTheme } from '../theme';
 import { PaneLoading } from './ui/pane-loading';
@@ -13,25 +14,10 @@ export function ScalarDocs({ projectId }: { projectId: string }) {
   const { theme } = useTheme();
   // Fetch the bundled spec ourselves (with the auth token) and hand it to Scalar as
   // `content` — Scalar's own fetch wouldn't carry our JWT, so the gated URL would 401.
-  // Also gives a clean empty state when the project has no spec yet.
-  const [state, setState] = useState<'loading' | 'ready' | 'empty'>('loading');
-  const [spec, setSpec] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setState('loading');
-    api
-      .exportSpec(projectId, 'json')
-      .then((text) => {
-        if (cancelled) return;
-        setSpec(text);
-        setState('ready');
-      })
-      .catch(() => !cancelled && setState('empty'));
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+  // A failed export reads as "no spec yet": that is the one way it fails on a project of ours.
+  const bundle = useResource(() => api.exportSpec(projectId, 'json'), [projectId], { keepPrevious: false });
+  const spec = bundle.data ?? null;
+  const state = bundle.status === 'error' ? 'empty' : bundle.status;
 
   // Scalar resolves the color mode once, at mount: body.dark-mode/.light-mode carries every
   // --scalar-* var, and a config update never re-applies it. Drive the class ourselves so a

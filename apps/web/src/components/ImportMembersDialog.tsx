@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, type Member } from '../api';
+import { api } from '../api';
 import { errorText } from '../lib/errors';
 import { cn } from '../lib/utils';
 import { Dialog } from './ui/dialog';
@@ -9,6 +9,7 @@ import { SkeletonRows } from './ui/skeleton';
 import { ErrorText } from './ui/ErrorText';
 import { selectCls } from './ui/select';
 import { useDialogForm } from '../hooks/useDialogForm';
+import { useResource } from '../hooks/useResource';
 
 /**
  * Take another project's roster wholesale. Picking the project is the whole decision — everyone
@@ -30,36 +31,19 @@ export function ImportMembersDialog({
   onImported: () => void;
 }) {
   const { t } = useTranslation();
-  // null until the first answer: an empty list means there is nothing to copy from.
-  const [sources, setSources] = useState<{ id: string; name: string }[] | null>(null);
   const [from, setFrom] = useState('');
-  const [roster, setRoster] = useState<Member[] | null>([]);
-
-  const form = useDialogForm(open, () => {
-    setFrom('');
-    setRoster([]);
+  const sources = useResource(() => api.memberSources(projectId), [open, projectId], {
+    enabled: open,
+    keepPrevious: false,
   });
+  // Another source's roster under this source's name would be worse than a blank, so no carry-over.
+  const roster = useResource(() => api.listMembers(from), [from], { enabled: !!from, keepPrevious: false });
+  const rosterList = from ? roster.data : [];
 
-  useEffect(() => {
-    if (!open) return;
-    api
-      .memberSources(projectId)
-      .then(setSources)
-      .catch((e: unknown) => form.setError(errorText(e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- form.setError is stable
-  }, [open, projectId]);
+  const form = useDialogForm(open, () => setFrom(''));
 
-  useEffect(() => {
-    if (!from) return setRoster([]);
-    setRoster(null);
-    api
-      .listMembers(from)
-      .then(setRoster)
-      .catch((e: unknown) => form.setError(errorText(e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- form.setError is stable
-  }, [from]);
-
-  const incoming = (roster ?? []).filter((m) => !memberIds.has(m.userId));
+  const incoming = (rosterList ?? []).filter((m) => !memberIds.has(m.userId));
+  const readError = sources.error ?? (from ? roster.error : null);
 
   const submit = () => {
     if (incoming.length === 0) return;
@@ -76,9 +60,9 @@ export function ImportMembersDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={t('importMembers')}>
-      {sources === null ? (
+      {sources.data === undefined ? (
         <SkeletonRows rows={2} height="h-8" />
-      ) : sources.length === 0 ? (
+      ) : sources.data.length === 0 ? (
         <p className="text-[13px] text-muted">{t('noCopySources')}</p>
       ) : (
         <>
@@ -89,15 +73,15 @@ export function ImportMembersDialog({
             onChange={(e) => setFrom(e.target.value)}
           >
             <option value="">{t('selectProject')}</option>
-            {sources.map((p) => (
+            {sources.data.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
           </select>
           <div className="mt-3 max-h-56 space-y-1 overflow-auto">
-            {roster === null && <SkeletonRows rows={3} height="h-5" />}
-            {(roster ?? []).map((m) => {
+            {rosterList === undefined && <SkeletonRows rows={3} height="h-5" />}
+            {(rosterList ?? []).map((m) => {
               const already = memberIds.has(m.userId);
               return (
                 <div
@@ -113,7 +97,7 @@ export function ImportMembersDialog({
           </div>
         </>
       )}
-      <ErrorText error={form.error} className="mt-2" />
+      <ErrorText error={form.error ?? (readError ? errorText(readError) : null)} className="mt-2" />
       <DialogFooter
         onCancel={() => onOpenChange(false)}
         confirmLabel={t('import')}

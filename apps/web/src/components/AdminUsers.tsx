@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, KeyRound, Trash2, Ban, Check } from 'lucide-react';
 import { api, type AdminUser } from '../api';
@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import { useConfirm } from './ConfirmProvider';
 import { useDialogForm } from '../hooks/useDialogForm';
 import { useBusy } from '../hooks/useBusy';
+import { useResource } from '../hooks/useResource';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog } from './ui/dialog';
@@ -26,31 +27,17 @@ const selectCls = cn(baseSelect, 'h-7'); // compact for table rows
 export function AdminUsers({ meId }: { meId: string }) {
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
-  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const users = useResource(() => api.listUsers<AdminUser>(), []);
   const act = useBusy();
-  const [error, setError] = useState<string | null>(null);
 
   const [creating, setCreating] = useState(false);
   const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
 
-  const refresh = () => {
-    api
-      .listUsers<AdminUser>()
-      .then(setUsers)
-      .catch((e: unknown) => setError(errorText(e)));
-  };
-  useEffect(refresh, []);
-
-  // Any mutation shares one error surface; refresh on success.
+  // Every mutation re-reads the table on success; failures share the one error line.
   const mutate = (key: string, fn: () => Promise<unknown>) =>
     act.run(key, async () => {
-      setError(null);
-      try {
-        await fn();
-        refresh();
-      } catch (e) {
-        setError(errorText(e));
-      }
+      await fn();
+      users.reload();
     });
 
   const setRole = (u: AdminUser, role: 'admin' | 'member') =>
@@ -77,13 +64,8 @@ export function AdminUsers({ meId }: { meId: string }) {
     )
       return;
     await act.run(`reset:${u.id}`, async () => {
-      setError(null);
-      try {
-        const { password } = await api.adminResetPassword(u.id);
-        setIssued({ username: u.username, password });
-      } catch (e) {
-        setError(errorText(e));
-      }
+      const { password } = await api.adminResetPassword(u.id);
+      setIssued({ username: u.username, password });
     });
   };
 
@@ -111,7 +93,10 @@ export function AdminUsers({ meId }: { meId: string }) {
           <Plus size={16} />
         </button>
       </div>
-      <ErrorText error={error} className="mb-3 text-[14px]" />
+      <ErrorText
+        error={act.error?.text ?? (users.error ? errorText(users.error) : null)}
+        className="mb-3 text-[14px]"
+      />
 
       <div className="overflow-hidden rounded-xl border border-border">
         <table className="w-full text-[13px]">
@@ -125,14 +110,14 @@ export function AdminUsers({ meId }: { meId: string }) {
             </tr>
           </thead>
           <tbody>
-            {users === null && (
+            {users.data === undefined && (
               <tr>
                 <td colSpan={5} className="px-3 py-2">
                   <SkeletonRows rows={3} height="h-7" />
                 </td>
               </tr>
             )}
-            {(users ?? []).map((u) => {
+            {(users.data ?? []).map((u) => {
               const isSelf = u.id === meId;
               const disabled = u.status === 'disabled';
               return (
@@ -218,7 +203,7 @@ export function AdminUsers({ meId }: { meId: string }) {
         onCreated={(cred) => {
           setCreating(false);
           setIssued(cred);
-          refresh();
+          users.reload();
         }}
       />
       <CredentialsDialog cred={issued} onClose={() => setIssued(null)} />
