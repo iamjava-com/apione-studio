@@ -9,6 +9,9 @@ import { EDITOR_FONT } from '../lib/editor-font';
 import { useTheme } from '../theme';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
+import { Spinner } from './ui/spinner';
+import { PaneLoading } from './ui/pane-loading';
+import { EditorPlaceholder } from './ui/editor-placeholder';
 import { MockDebugPanel } from './MockDebugPanel';
 import { MockOperationList } from './MockOperationList';
 import { MethodBadge } from './ui/method-badge';
@@ -67,9 +70,21 @@ export function MockView({
   );
   const key = active?.opId ?? null;
 
-  const { saving, error, conflict, code, dirty, dirtyKeys, setCode, save, reloadCode, reset, changeMode } = useMockCode(
-    { projectId, key, catalog, reloadCatalog, drafts, setDrafts },
-  );
+  const {
+    saving,
+    switching,
+    loaded,
+    error,
+    conflict,
+    code,
+    dirty,
+    dirtyKeys,
+    setCode,
+    save,
+    reloadCode,
+    reset,
+    changeMode,
+  } = useMockCode({ projectId, key, catalog, reloadCatalog, drafts, setDrafts });
 
   const mode = active?.mode ?? 'auto';
   // Monaco keys the language service off the model URI, so it has to look like a real .js file.
@@ -136,13 +151,14 @@ export function MockView({
                   {t('reset')}
                 </Button>
               )}
-              <ModeToggle mode={mode} disabled={!canWrite} onChange={(m) => void changeMode(m)} />
+              <ModeToggle mode={mode} pending={switching} disabled={!canWrite} onChange={(m) => void changeMode(m)} />
               {mode === 'scripted' && canWrite && (
                 <Button
                   variant="brand"
                   size="sm"
                   className="shrink-0"
-                  disabled={!dirty || saving}
+                  disabled={!dirty}
+                  busy={saving}
                   onClick={() => void save()}
                 >
                   {saving ? t('saving') : t('save')}
@@ -182,16 +198,22 @@ export function MockView({
                     {t('mockViewSchema')}
                   </Button>
                   {canWrite && (
-                    <Button size="sm" variant="brand" onClick={() => void changeMode('scripted')}>
+                    <Button
+                      size="sm"
+                      variant="brand"
+                      busy={switching === 'scripted'}
+                      onClick={() => void changeMode('scripted')}
+                    >
                       {t('mockEnableCustom')}
                     </Button>
                   )}
                 </div>
               </div>
             ) : (
-              <div className={cn('min-h-0 flex-1', readOnly && 'opacity-70')}>
+              <div className={cn('relative min-h-0 flex-1', readOnly && 'opacity-70')}>
                 <Editor
                   height="100%"
+                  loading={<PaneLoading />}
                   theme={`apione-${theme}`}
                   language="javascript"
                   // A .js path is what makes the TS language service claim the model — without it
@@ -211,6 +233,7 @@ export function MockView({
                     fontFamily: EDITOR_FONT,
                   }}
                 />
+                {!loaded && <EditorPlaceholder />}
               </div>
             )}
           </div>
@@ -247,10 +270,13 @@ export function MockView({
 
 function ModeToggle({
   mode,
+  pending,
   disabled,
   onChange,
 }: {
   mode: MockMode;
+  /** The mode a switch is in flight to; both buttons wait for it. */
+  pending: MockMode | null;
   disabled: boolean;
   onChange: (m: MockMode) => void;
 }) {
@@ -260,13 +286,16 @@ function ModeToggle({
       {(['auto', 'scripted'] as const).map((m) => (
         <button
           key={m}
-          disabled={disabled}
+          disabled={disabled || pending !== null}
+          aria-busy={pending === m || undefined}
           onClick={() => onChange(m)}
           className={cn(
-            'shrink-0 whitespace-nowrap rounded px-2 py-0.5 text-[12px] disabled:opacity-50',
+            'flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-2 py-0.5 text-[12px] disabled:opacity-50',
             mode === m ? 'bg-raised text-text' : 'text-muted hover:text-text',
+            pending === m && 'disabled:opacity-100',
           )}
         >
+          {pending === m && <Spinner size={12} />}
           {t(m === 'auto' ? 'mockModeAuto' : 'mockModeScripted')}
         </button>
       ))}

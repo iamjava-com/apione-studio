@@ -4,6 +4,7 @@ import { Copy, UserKey } from 'lucide-react';
 import type { Project } from '../../api';
 import { formatDate } from '../../lib/format';
 import { cn } from '../../lib/utils';
+import { Spinner } from '../ui/spinner';
 
 /**
  * One project tile. Draggable only when the caller could actually re-file it — a card that lifts
@@ -15,12 +16,16 @@ export function ProjectCard({
   project,
   canMove,
   duplicating,
+  locked,
   onOpen,
   onDuplicate,
 }: {
   project: Project;
   canMove: boolean;
+  /** This card's copy is being made. */
   duplicating: boolean;
+  /** Some other list action is in flight; the copy button waits its turn. */
+  locked: boolean;
   onOpen: (p: Project) => void;
   onDuplicate: (p: Project) => void;
 }) {
@@ -58,16 +63,20 @@ export function ProjectCard({
       <button
         aria-label={t('duplicate')}
         title={t('duplicate')}
-        disabled={duplicating}
+        disabled={locked}
+        aria-busy={duplicating || undefined}
         // Stop the pointer here, or pressing Duplicate would start dragging the card instead.
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           onDuplicate(project);
         }}
-        className="absolute right-2.5 top-2.5 rounded p-1 text-faint opacity-0 transition-opacity hover:text-text disabled:opacity-100 group-hover:opacity-100"
+        className={cn(
+          'absolute right-2.5 top-2.5 rounded p-1 text-faint opacity-0 transition-opacity hover:text-text group-hover:opacity-100',
+          duplicating && 'opacity-100',
+        )}
       >
-        <Copy size={14} />
+        {duplicating ? <Spinner /> : <Copy size={14} />}
       </button>
     </div>
   );

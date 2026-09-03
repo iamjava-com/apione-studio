@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { ErrorText } from './ui/ErrorText';
 import { selectCls } from './ui/select';
 import { useCombobox } from '../hooks/useCombobox';
+import { useBusy } from '../hooks/useBusy';
 import { ImportMembersDialog } from './ImportMembersDialog';
 
 const ROLES = ['owner', 'editor', 'tester', 'viewer'];
@@ -128,6 +129,7 @@ export function Members({
   const [role, setRole] = useState('viewer');
   const [error, setError] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
+  const act = useBusy();
 
   useEffect(() => {
     if (!canManage) return; // the directory only feeds the add-member picker
@@ -139,26 +141,29 @@ export function Members({
 
   const memberIds = new Set(members.map((m) => m.userId));
 
-  const add = async () => {
+  const add = () => {
     if (!selected) return;
-    setError(null);
-    try {
-      await api.addMember(projectId, selected.username, role);
-      setSelected(null);
-      reload();
-    } catch (e) {
-      setError(errorText(e));
-    }
+    void act.run('add', async () => {
+      setError(null);
+      try {
+        await api.addMember(projectId, selected.username, role);
+        setSelected(null);
+        reload();
+      } catch (e) {
+        setError(errorText(e));
+      }
+    });
   };
-  const changeRole = async (m: Member, next: string) => {
-    setError(null);
-    try {
-      await api.updateMemberRole(projectId, m.userId, next);
-    } catch (e) {
-      setError(errorText(e));
-    }
-    reload(); // the server's answer either way — success or the value it kept
-  };
+  const changeRole = (m: Member, next: string) =>
+    act.run(`role:${m.userId}`, async () => {
+      setError(null);
+      try {
+        await api.updateMemberRole(projectId, m.userId, next);
+      } catch (e) {
+        setError(errorText(e));
+      }
+      reload(); // the server's answer either way — success or the value it kept
+    });
   const remove = async (m: Member) => {
     if (
       !(await confirm({
@@ -168,13 +173,15 @@ export function Members({
       }))
     )
       return;
-    setError(null);
-    try {
-      await api.removeMember(projectId, m.userId);
-      reload();
-    } catch (e) {
-      setError(errorText(e));
-    }
+    await act.run(`rm:${m.userId}`, async () => {
+      setError(null);
+      try {
+        await api.removeMember(projectId, m.userId);
+        reload();
+      } catch (e) {
+        setError(errorText(e));
+      }
+    });
   };
   const owners = members.filter((m) => m.role === 'owner').length;
 
@@ -196,7 +203,7 @@ export function Members({
                 </option>
               ))}
             </select>
-            <Button size="sm" disabled={!selected} onClick={add}>
+            <Button size="sm" disabled={!selected || act.locked} busy={act.busy === 'add'} onClick={add}>
               {t('addMember')}
             </Button>
           </div>
@@ -226,9 +233,9 @@ export function Members({
                   aria-label={`role-${m.username}`}
                   className={rowSelectCls}
                   value={m.role}
-                  disabled={locked}
+                  disabled={locked || act.locked}
                   title={lastOwner ? t('lastOwnerHint') : undefined}
-                  onChange={(e) => changeRole(m, e.target.value)}
+                  onChange={(e) => void changeRole(m, e.target.value)}
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -240,7 +247,8 @@ export function Members({
                   size="sm"
                   variant="ghost"
                   aria-label={`remove-${m.username}`}
-                  disabled={locked}
+                  disabled={locked || act.locked}
+                  busy={act.busy === `rm:${m.userId}`}
                   title={lastOwner ? t('lastOwnerHint') : undefined}
                   onClick={() => remove(m)}
                 >

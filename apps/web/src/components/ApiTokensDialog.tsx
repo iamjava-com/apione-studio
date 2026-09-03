@@ -7,6 +7,9 @@ import { formatDate } from '../lib/format';
 import { useConfirm } from './ConfirmProvider';
 import { useDialogForm } from '../hooks/useDialogForm';
 import { Button } from './ui/button';
+import { Spinner } from './ui/spinner';
+import { SkeletonRows } from './ui/skeleton';
+import { useBusy } from '../hooks/useBusy';
 import { Input } from './ui/input';
 import { Dialog } from './ui/dialog';
 import { CopyButton } from './ui/CopyButton';
@@ -17,7 +20,8 @@ import { ErrorText } from './ui/ErrorText';
 export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
-  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [tokens, setTokens] = useState<ApiToken[] | null>(null);
+  const act = useBusy();
   const [name, setName] = useState('');
   const [issued, setIssued] = useState<CreatedApiToken | null>(null);
 
@@ -52,14 +56,16 @@ export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenC
       }))
     )
       return;
-    form.setError(null);
-    try {
-      await api.revokeApiToken(tok.id);
-      if (issued?.id === tok.id) setIssued(null);
-      await refresh();
-    } catch (e) {
-      form.setError(errorText(e));
-    }
+    await act.run(`rm:${tok.id}`, async () => {
+      form.setError(null);
+      try {
+        await api.revokeApiToken(tok.id);
+        if (issued?.id === tok.id) setIssued(null);
+        await refresh();
+      } catch (e) {
+        form.setError(errorText(e));
+      }
+    });
   };
 
   return (
@@ -92,14 +98,15 @@ export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenC
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && create()}
         />
-        <Button variant="brand" size="sm" disabled={!name.trim() || form.busy} onClick={create}>
+        <Button variant="brand" size="sm" disabled={!name.trim()} busy={form.busy} onClick={create}>
           {t('createApiToken')}
         </Button>
       </div>
 
       <ErrorText error={form.error} className="mt-2" />
 
-      {tokens.length > 0 && (
+      {tokens === null && <SkeletonRows rows={2} className="mt-4" />}
+      {tokens && tokens.length > 0 && (
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
           {tokens.map((tok) => (
             <li key={tok.id} className="flex items-center gap-3 px-3 py-2">
@@ -114,9 +121,11 @@ export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenC
                 aria-label={`revoke-${tok.name}`}
                 title={t('revoke')}
                 onClick={() => revoke(tok)}
-                className="rounded p-1 text-faint transition-colors hover:text-delete"
+                disabled={act.locked}
+                aria-busy={act.busy === `rm:${tok.id}` || undefined}
+                className="rounded p-1 text-faint transition-colors hover:text-delete disabled:pointer-events-none"
               >
-                <Trash2 size={14} />
+                {act.busy === `rm:${tok.id}` ? <Spinner /> : <Trash2 size={14} />}
               </button>
             </li>
           ))}

@@ -57,6 +57,8 @@ export function useMockCode({
   // Server-side content per endpoint; `drafts` layers the unsaved edit on top.
   const [saved, setSaved] = useState<Record<string, SavedCode>>({});
   const [saving, setSaving] = useState(false);
+  // The mode being switched to while the server is told about it.
+  const [switching, setSwitching] = useState<MockMode | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Someone else has written this mock since we read it.
   const [conflict, setConflict] = useState(false);
@@ -181,8 +183,7 @@ export function useMockCode({
     setDrafts((d) => dropDraft(d, key));
   };
 
-  const changeMode = async (next: MockMode) => {
-    if (!key) return;
+  const applyMode = async (key: string, next: MockMode) => {
     // Switching to scripted with nothing written would leave the endpoint claiming "custom" while
     // still falling through to auto. Save the starter so the choice takes effect immediately —
     // and so the editor opens clean, rather than pre-dirtied by a template the user never typed.
@@ -204,5 +205,32 @@ export function useMockCode({
     reloadCatalog();
   };
 
-  return { saving, error, conflict, code, dirty, dirtyKeys, setCode, save, reloadCode, reset, changeMode };
+  const changeMode = async (next: MockMode) => {
+    if (!key || switching) return;
+    setSwitching(next);
+    try {
+      await applyMode(key, next);
+    } finally {
+      setSwitching(null);
+    }
+  };
+
+  // No saved entry yet means the read is still out (or failed — `error` says so).
+  const loaded = !key || saved[key] !== undefined;
+
+  return {
+    saving,
+    switching,
+    loaded,
+    error,
+    conflict,
+    code,
+    dirty,
+    dirtyKeys,
+    setCode,
+    save,
+    reloadCode,
+    reset,
+    changeMode,
+  };
 }

@@ -66,7 +66,8 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
       <DialogFooter
         onCancel={() => onOpenChange(false)}
         confirmLabel={t('save')}
-        disabled={!current || !next || form.busy}
+        disabled={!current || !next}
+        busy={form.busy}
         onConfirm={submit}
       />
     </Dialog>

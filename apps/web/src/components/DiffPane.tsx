@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '../lib/utils';
 import { useLineDiff } from '../hooks/useLineDiff';
+import { Spinner } from './ui/spinner';
 
 type Row = { kind: 'add' | 'del' | 'ctx'; n: number; text: string } | { kind: 'gap' };
 
@@ -73,7 +74,10 @@ export function DiffPane({ base, target, expandAll }: { base: string; target: st
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto p-2 font-mono text-[12px] leading-snug">
       {diff.status === 'pending' ? (
-        <p className="px-1 text-faint">{t('diffComputing')}</p>
+        <p className="flex items-center gap-1.5 px-1 text-faint">
+          <Spinner size={12} />
+          {t('diffComputing')}
+        </p>
       ) : diff.status === 'gaveUp' ? (
         <p className="px-1 text-faint">{t('diffTooDifferent')}</p>
       ) : rows.length === 0 ? (

@@ -150,7 +150,8 @@ export function NewProjectDialog({
       <DialogFooter
         onCancel={() => onOpenChange(false)}
         confirmLabel={stagedFile ? t('import') : t('create')}
-        disabled={form.busy || previewing || (stagedFile ? !preview : !name.trim())}
+        disabled={previewing || (stagedFile ? !preview : !name.trim())}
+        busy={form.busy}
         onConfirm={submit}
       />
     </Dialog>

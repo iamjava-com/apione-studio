@@ -5,6 +5,7 @@ import '@scalar/api-reference-react/style.css';
 import { api } from '../api';
 import { serverBasePaths } from '../lib/base-path';
 import { useTheme } from '../theme';
+import { PaneLoading } from './ui/pane-loading';
 
 /** Scalar docs rendered INLINE (no iframe): shares our DOM, fonts, and theme. */
 export function ScalarDocs({ projectId }: { projectId: string }) {
@@ -74,7 +75,7 @@ export function ScalarDocs({ projectId }: { projectId: string }) {
       </div>
     );
   }
-  if (state === 'loading') return <div className="h-full" />;
+  if (state === 'loading') return <PaneLoading />;
 
   return (
     <div className="scalar-docs h-full overflow-auto">

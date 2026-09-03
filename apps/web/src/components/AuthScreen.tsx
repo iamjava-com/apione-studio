@@ -75,7 +75,8 @@ export function AuthScreen({ needsSetup, onAuthed }: { needsSetup: boolean; onAu
             aria-label="auth-submit"
             variant="brand"
             className="w-full"
-            disabled={!username.trim() || !password || busy}
+            disabled={!username.trim() || !password}
+            busy={busy}
             onClick={submit}
           >
             {needsSetup ? t('setupAdmin') : t('login')}

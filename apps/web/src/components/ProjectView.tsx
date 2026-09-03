@@ -24,6 +24,7 @@ import { Button } from './ui/button';
 import { ResizeHandle } from './ui/resize-handle';
 import { ErrorBoundary } from './ErrorBoundary';
 import { HTTP_METHODS } from './form/constants';
+import { PaneLoading } from './ui/pane-loading';
 
 // Both pull a heavy engine — Scalar its own renderer, MockView the Monaco editor — and neither is
 // on the path to the project someone just opened.
@@ -204,15 +205,20 @@ export function ProjectView({
     },
     [project.id, mode],
   );
+  const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const removeFile = async (path: string) => {
+    if (deletingPath) return;
     if (!(await confirm({ message: t('confirmDeleteFile', { path }), confirmLabel: t('delete'), danger: true })))
       return;
     setFileError(null);
+    setDeletingPath(path);
     try {
       await api.deleteFile(project.id, path);
     } catch (err) {
       setFileError(errorText(err));
       return;
+    } finally {
+      setDeletingPath(null);
     }
     if (activePath === path) setActivePath('openapi.yaml');
     refresh();
@@ -260,6 +266,7 @@ export function ProjectView({
           which is what lets someone reach the YAML view and see what the document actually says. */}
       <ErrorBoundary key={mode}>
         <div className="min-h-0 flex-1">
+          {mode === 'design' && !roleLoaded && <PaneLoading />}
           {/* Only the design canvas shows stages, so the one read they need is scoped to it. */}
           {mode === 'design' && roleLoaded && canWrite && (
             <OperationStagesProvider projectId={project.id}>
@@ -291,6 +298,7 @@ export function ProjectView({
                         activePath={activePath}
                         onSelectFile={(path) => void switchFile(path)}
                         onDeleteFile={(path) => void removeFile(path)}
+                        deletingPath={deletingPath}
                       />
                     </Panel>
                     <ResizeHandle />
@@ -366,7 +374,7 @@ export function ProjectView({
           )}
 
           {mode === 'mock' && (
-            <Suspense fallback={<div className="h-full" />}>
+            <Suspense fallback={<PaneLoading />}>
               <MockView
                 projectId={project.id}
                 canWrite={canMockWrite}
@@ -387,7 +395,7 @@ export function ProjectView({
           )}
 
           {mode === 'docs' && (
-            <Suspense fallback={<div className="h-full" />}>
+            <Suspense fallback={<PaneLoading />}>
               <ScalarDocs key={specRev} projectId={project.id} />
             </Suspense>
           )}

@@ -8,6 +8,7 @@ import { EDITOR_FONT } from '../lib/editor-font';
 import { useTheme } from '../theme';
 import { Button } from './ui/button';
 import { Dialog } from './ui/dialog';
+import { PaneLoading } from './ui/pane-loading';
 
 /**
  * The schema auto mode answers from. Opened on request rather than shown alongside the endpoint:
@@ -80,11 +81,13 @@ export function MockSchemaDialog({
       </div>
 
       {error && <p className="text-[13px] text-danger">{error}</p>}
+      {!error && !data && <PaneLoading className="h-24" />}
       {!error && data && data.schema === null && <p className="text-[13px] text-muted">{t('mockSchemaNone')}</p>}
       {!error && data && data.schema !== null && (
         <div className="overflow-hidden rounded-md border border-border" style={{ height }}>
           <Editor
             height="100%"
+            loading={<PaneLoading />}
             theme={`apione-${theme}`}
             language="yaml"
             value={yaml}

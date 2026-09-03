@@ -5,6 +5,7 @@ import { errorText } from '../lib/errors';
 import { cn } from '../lib/utils';
 import { Dialog } from './ui/dialog';
 import { DialogFooter } from './ui/DialogFooter';
+import { SkeletonRows } from './ui/skeleton';
 import { ErrorText } from './ui/ErrorText';
 import { selectCls } from './ui/select';
 import { useDialogForm } from '../hooks/useDialogForm';
@@ -29,9 +30,10 @@ export function ImportMembersDialog({
   onImported: () => void;
 }) {
   const { t } = useTranslation();
-  const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
+  // null until the first answer: an empty list means there is nothing to copy from.
+  const [sources, setSources] = useState<{ id: string; name: string }[] | null>(null);
   const [from, setFrom] = useState('');
-  const [roster, setRoster] = useState<Member[]>([]);
+  const [roster, setRoster] = useState<Member[] | null>([]);
 
   const form = useDialogForm(open, () => {
     setFrom('');
@@ -49,6 +51,7 @@ export function ImportMembersDialog({
 
   useEffect(() => {
     if (!from) return setRoster([]);
+    setRoster(null);
     api
       .listMembers(from)
       .then(setRoster)
@@ -56,7 +59,7 @@ export function ImportMembersDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- form.setError is stable
   }, [from]);
 
-  const incoming = roster.filter((m) => !memberIds.has(m.userId));
+  const incoming = (roster ?? []).filter((m) => !memberIds.has(m.userId));
 
   const submit = () => {
     if (incoming.length === 0) return;
@@ -73,7 +76,9 @@ export function ImportMembersDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={t('importMembers')}>
-      {sources.length === 0 ? (
+      {sources === null ? (
+        <SkeletonRows rows={2} height="h-8" />
+      ) : sources.length === 0 ? (
         <p className="text-[13px] text-muted">{t('noCopySources')}</p>
       ) : (
         <>
@@ -91,7 +96,8 @@ export function ImportMembersDialog({
             ))}
           </select>
           <div className="mt-3 max-h-56 space-y-1 overflow-auto">
-            {roster.map((m) => {
+            {roster === null && <SkeletonRows rows={3} height="h-5" />}
+            {(roster ?? []).map((m) => {
               const already = memberIds.has(m.userId);
               return (
                 <div
@@ -111,7 +117,8 @@ export function ImportMembersDialog({
       <DialogFooter
         onCancel={() => onOpenChange(false)}
         confirmLabel={t('import')}
-        disabled={form.busy || incoming.length === 0}
+        disabled={incoming.length === 0}
+        busy={form.busy}
         onConfirm={submit}
       />
     </Dialog>

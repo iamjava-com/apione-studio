@@ -4,6 +4,8 @@ import { api, type BreakingReport, type VersionMeta } from '../api';
 import { errorText } from '../lib/errors';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
+import { PaneLoading } from './ui/pane-loading';
+import { SkeletonRows } from './ui/skeleton';
 import { useConfirm } from './ConfirmProvider';
 import { DiffPane } from './DiffPane';
 import { HistoryChanges } from './HistoryChanges';
@@ -59,7 +61,7 @@ export function History({
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
   const focusApplied = useRef(false);
-  const [versions, setVersions] = useState<VersionMeta[]>([]);
+  const [versions, setVersions] = useState<VersionMeta[] | null>(null);
   const [head, setHead] = useState(0); // the current version number
   const [target, setTarget] = useState<number | null>(null); // version being inspected (right side)
   const [base, setBase] = useState<number | 'prev'>('prev'); // compare against (left side)
@@ -69,6 +71,8 @@ export function History({
   const [expandAll, setExpandAll] = useState(false);
   const [fileDiff, setFileDiff] = useState(false); // the whole-file text diff instead of the changelog
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [comparing, setComparing] = useState(false); // a base→target fetch is in flight
 
   const baseNo = target != null ? (base === 'prev' ? target - 1 : base) : 0;
   const hasBase = target != null && baseNo >= 1;
@@ -110,8 +114,14 @@ export function History({
       setBaseText(null);
       setTargetText(null);
       setChanges(null);
+      setComparing(false);
       return;
     }
+    // Clear the previous pair now: leaving it up reads as this pair's answer.
+    setBaseText(null);
+    setTargetText(null);
+    setChanges(null);
+    setComparing(true);
     let live = true;
     Promise.all([api.getVersionContent(projectId, path, baseNo), api.getVersionContent(projectId, path, target)])
       .then(([b, tg]) => {
@@ -127,28 +137,33 @@ export function History({
     api
       .changelog(projectId, baseNo, target)
       .then((r) => live && setChanges(r))
-      .catch(() => live && setChanges(null));
+      .catch(() => live && setChanges(null))
+      .finally(() => live && setComparing(false));
     return () => {
       live = false;
     };
   }, [projectId, path, target, baseNo, hasBase]);
 
   const restore = async (n: number) => {
+    if (restoring) return;
     const message = dirty ? t('restoreConfirmDirty') : '';
     if (!(await confirm({ title: t('restoreConfirmTitle', { v: n }), message, confirmLabel: t('restore') }))) return;
     // Reloading the editor on a failed restore would show the file unchanged and call it done.
     setRestoreError(null);
+    setRestoring(true);
     try {
       await api.restoreVersion(projectId, path, n);
     } catch (err) {
       setRestoreError(errorText(err));
       return;
+    } finally {
+      setRestoring(false);
     }
     onRestored();
     load();
   };
 
-  const olderThanTarget = versions.filter((v) => target != null && v.versionNo < target);
+  const olderThanTarget = (versions ?? []).filter((v) => target != null && v.versionNo < target);
   // The text diff is the fallback when the engine is missing, and a choice otherwise.
   const showText = changes != null && (!changes.available || fileDiff);
 
@@ -159,8 +174,9 @@ export function History({
       )}
       {/* version list (spine) — click a row to inspect it */}
       <div className="max-h-44 overflow-auto border-b border-border">
-        {versions.length === 0 && <p className="p-3 text-[14px] text-muted">—</p>}
-        {versions.map((v) => (
+        {versions === null && <SkeletonRows rows={3} height="h-7" className="p-3" />}
+        {versions?.length === 0 && <p className="p-3 text-[14px] text-muted">—</p>}
+        {(versions ?? []).map((v) => (
           <button
             key={v.versionNo}
             onClick={() => {
@@ -223,7 +239,7 @@ export function History({
             )}
             <div className="flex-1" />
             {target < head && (
-              <Button size="sm" onClick={() => void restore(target)}>
+              <Button size="sm" busy={restoring} onClick={() => void restore(target)}>
                 {t('restoreTo', { v: target })}
               </Button>
             )}
@@ -246,6 +262,8 @@ export function History({
 
           {!hasBase ? (
             <p className="px-3 py-2 text-[12px] text-faint">{t('diffNoBase')}</p>
+          ) : comparing ? (
+            <PaneLoading className="py-10" />
           ) : changes == null ? null : showText ? (
             baseText == null || targetText == null ? null : (
               <DiffPane base={baseText} target={targetText} expandAll={expandAll} />
