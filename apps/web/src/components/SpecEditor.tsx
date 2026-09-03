@@ -12,6 +12,7 @@ const loadYamlView = () => import('./YamlView');
 const YamlView = lazy(() => loadYamlView().then((m) => ({ default: m.YamlView })));
 import { LintStatus } from './LintStatus';
 import { EditorPlaceholder } from './ui/editor-placeholder';
+import { PaneLoading } from './ui/pane-loading';
 import { useConfirm } from './ConfirmProvider';
 import type { Selection } from './form/types';
 import { PendingEditsProvider } from './form/PendingEdits';
@@ -103,7 +104,8 @@ export function SpecEditor({
         <Button
           variant="brand"
           size="sm"
-          disabled={file.status === 'saving' || (!file.dirty && pendingEdits === 0)}
+          disabled={!file.dirty && pendingEdits === 0}
+          busy={file.status === 'saving'}
           // Hold the focus through mousedown: the browser's blur there commits mid-click, and the
           // label that clears moves the button out from under the pointer, so mouseup misses.
           onMouseDown={(e) => e.preventDefault()}
@@ -112,7 +114,7 @@ export function SpecEditor({
           {file.status === 'saving' ? t('saving') : t('save')}
         </Button>
         {file.status === 'saved' && (
-          <span className="text-[13px] text-post">{t('saved', { version: file.version })}</span>
+          <span className="animate-linger text-[13px] text-post">{t('saved', { version: file.version })}</span>
         )}
       </div>
 
@@ -135,11 +137,14 @@ export function SpecEditor({
       )}
 
       <div className="min-h-0 flex-1">
-        {view === 'form' && (
-          <PendingEditsProvider onChange={(d) => setPendingEdits((n) => Math.max(0, n + d))}>
-            <FormView file={file} selection={selection} onSelect={onSelect} />
-          </PendingEditsProvider>
-        )}
+        {view === 'form' &&
+          (file.loaded ? (
+            <PendingEditsProvider onChange={(d) => setPendingEdits((n) => Math.max(0, n + d))}>
+              <FormView file={file} selection={selection} onSelect={onSelect} />
+            </PendingEditsProvider>
+          ) : (
+            <PaneLoading />
+          ))}
         {/* Once opened, the YAML editor stays mounted and is only hidden: building a Monaco model
             for a large document takes hundreds of milliseconds, and that is paid once. */}
         {yamlOpened && (

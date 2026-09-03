@@ -17,10 +17,13 @@ import { errorText } from '../lib/errors';
 import { toggleInSet } from '../lib/utils';
 import { useConfirm } from './ConfirmProvider';
 import { useDialogForm } from '../hooks/useDialogForm';
+import { useBusy } from '../hooks/useBusy';
 import { Input } from './ui/input';
 import { Dialog } from './ui/dialog';
 import { DialogFooter } from './ui/DialogFooter';
 import { ErrorText } from './ui/ErrorText';
+import { Delayed } from './ui/delayed';
+import { Skeleton } from './ui/skeleton';
 import { GroupSection } from './project-list/GroupSection';
 import { NewProjectDialog } from './project-list/NewProjectDialog';
 
@@ -43,7 +46,8 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
   const [projects, setProjects] = useState<Project[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const act = useBusy();
   const [fileOver, setFileOver] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
   const [movingId, setMovingId] = useState<string | null>(null); // project being dragged between groups
@@ -61,8 +65,12 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
       .then(([ps, gs]) => {
         setProjects(ps);
         setGroups(gs);
+        setLoaded(true);
       })
-      .catch((e: unknown) => setError(errorText(e)));
+      .catch((e: unknown) => {
+        setError(errorText(e));
+        setLoaded(true);
+      });
   };
   useEffect(refresh, []);
 
@@ -130,37 +138,36 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
     if (--dragDepth.current <= 0) setFileOver(false);
   };
 
-  const duplicate = async (p: Project) => {
-    if (duplicatingId) return;
-    setError(null);
-    setDuplicatingId(p.id);
-    try {
-      const text = await api.exportSpec(p.id, 'yaml').catch((e) => {
-        if (e instanceof ApiError && e.status === 404) return null; // never-saved project → empty copy
-        throw e;
-      });
-      const copy = await api.createProject(t('copyOfName', { name: p.name }), p.groupId);
-      if (text) await api.importSpec(copy.id, text);
-      refresh();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setDuplicatingId(null);
-    }
-  };
+  const duplicate = (p: Project) =>
+    act.run(`dup:${p.id}`, async () => {
+      setError(null);
+      try {
+        const text = await api.exportSpec(p.id, 'yaml').catch((e) => {
+          if (e instanceof ApiError && e.status === 404) return null; // never-saved project → empty copy
+          throw e;
+        });
+        const copy = await api.createProject(t('copyOfName', { name: p.name }), p.groupId);
+        if (text) await api.importSpec(copy.id, text);
+        refresh();
+      } catch (e) {
+        setError(errorText(e));
+      }
+    });
 
   const removeGroup = async (g: Group) => {
     if (
       !(await confirm({ message: t('confirmDeleteGroup', { name: g.name }), confirmLabel: t('delete'), danger: true }))
     )
       return;
-    setError(null);
-    try {
-      await api.deleteGroup(g.id);
-      refresh();
-    } catch (e) {
-      setError(errorText(e));
-    }
+    await act.run(`del:${g.id}`, async () => {
+      setError(null);
+      try {
+        await api.deleteGroup(g.id);
+        refresh();
+      } catch (e) {
+        setError(errorText(e));
+      }
+    });
   };
 
   // Ungrouped first, then groups in server order (newest first).
@@ -169,7 +176,7 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
     ...groups.map((g) => ({ group: g, projects: projects.filter((p) => p.groupId === g.id) })),
   ];
   // Nothing at all to show — not even an empty group to file into.
-  const blank = projects.length === 0 && groups.length === 0 && !error;
+  const blank = loaded && projects.length === 0 && groups.length === 0 && !error;
 
   return (
     <div
@@ -201,7 +208,15 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
         </div>
         <ErrorText error={error} className="mb-3 text-[14px]" />
 
-        {blank ? (
+        {!loaded ? (
+          <Delayed>
+            <div aria-busy className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-[76px] rounded-xl" />
+              ))}
+            </div>
+          </Delayed>
+        ) : blank ? (
           <button
             onClick={() => openCreate(null)}
             className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border py-16 text-muted transition-colors hover:border-brand hover:text-text"
@@ -230,7 +245,7 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
                   collapsed={!!s.group && collapsed.has(s.group.id)}
                   dragging={!!movingId}
                   isAdmin={isAdmin}
-                  duplicatingId={duplicatingId}
+                  busy={act.busy}
                   onOpen={onOpen}
                   onDuplicate={(p) => void duplicate(p)}
                   onNewProject={() => openCreate(s.group?.id ?? null)}
@@ -317,7 +332,8 @@ function GroupDialog({
       <DialogFooter
         onCancel={onClose}
         confirmLabel={isNew ? t('create') : t('save')}
-        disabled={form.busy || !name.trim()}
+        disabled={!name.trim()}
+        busy={form.busy}
         onConfirm={submit}
       />
     </Dialog>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { api, ApiError, type ExportFormat, type Group, type Member, type Project } from '../api';
 import { errorText } from '../lib/errors';
 import { useConfirm } from './ConfirmProvider';
+import { useBusy } from '../hooks/useBusy';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { ErrorText } from './ui/ErrorText';
@@ -10,6 +11,7 @@ import { Input } from './ui/input';
 import { Dialog } from './ui/dialog';
 import { selectCls } from './ui/select';
 import { Members } from './Members';
+import { SkeletonRows } from './ui/skeleton';
 
 type Section = 'general' | 'members' | 'export' | 'replace' | 'danger';
 
@@ -68,7 +70,8 @@ export function SettingsDialog({
   const [replaceError, setReplaceError] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState(project.name);
   const [renameError, setRenameError] = useState<string | null>(null);
-  const [renaming, setRenaming] = useState(false);
+  // One action at a time across every section: a second click lands on a disabled button.
+  const act = useBusy();
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [dangerError, setDangerError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -118,53 +121,56 @@ export function SettingsDialog({
   // longer be visible — fall back to the first section the user can actually access.
   const active: Section = sections.some((s) => s.id === section) ? section : (sections[0]?.id ?? 'export');
 
-  const runExport = async (format: ExportFormat, strip: boolean) => {
-    setExportError(null);
-    try {
-      await download(project, format, { stripExt: strip, releasedOnly });
-    } catch (err) {
-      setExportError(errorText(err));
-    }
-  };
+  const runExport = (format: ExportFormat, strip: boolean) =>
+    act.run(`export:${format}`, async () => {
+      setExportError(null);
+      try {
+        await download(project, format, { stripExt: strip, releasedOnly });
+      } catch (err) {
+        setExportError(errorText(err));
+      }
+    });
 
-  const saveName = async () => {
+  const saveName = () => {
     const name = nameDraft.trim();
-    if (!name || name === project.name || renaming) return;
-    setRenameError(null);
-    setRenaming(true);
-    try {
-      await api.updateProject(project.id, { name });
-      onRenamed();
-    } catch (err) {
-      setRenameError(errorText(err));
-    } finally {
-      setRenaming(false);
-    }
+    if (!name || name === project.name) return;
+    void act.run('rename', async () => {
+      setRenameError(null);
+      try {
+        await api.updateProject(project.id, { name });
+        onRenamed();
+      } catch (err) {
+        setRenameError(errorText(err));
+      }
+    });
   };
 
-  const moveToGroup = async (groupId: string | null) => {
-    setRenameError(null);
-    try {
-      await api.updateProject(project.id, { groupId });
-      onRenamed(); // same refresh path — the list re-reads the project either way
-    } catch (err) {
-      setRenameError(errorText(err));
-    }
-  };
+  const moveToGroup = (groupId: string | null) =>
+    act.run('group', async () => {
+      setRenameError(null);
+      try {
+        await api.updateProject(project.id, { groupId });
+        onRenamed(); // same refresh path — the list re-reads the project either way
+      } catch (err) {
+        setRenameError(errorText(err));
+      }
+    });
 
   const onReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     if (!(await confirm({ message: t('replaceConfirm'), confirmLabel: t('overwriteImport'), danger: true }))) return;
-    setReplaceError(null);
-    try {
-      await api.importSpec(project.id, await file.text());
-      onReplaced();
-      onOpenChange(false);
-    } catch (err) {
-      setReplaceError(errorText(err));
-    }
+    await act.run('replace', async () => {
+      setReplaceError(null);
+      try {
+        await api.importSpec(project.id, await file.text());
+        onReplaced();
+        onOpenChange(false);
+      } catch (err) {
+        setReplaceError(errorText(err));
+      }
+    });
   };
   const remove = async () => {
     if (
@@ -176,15 +182,17 @@ export function SettingsDialog({
       }))
     )
       return;
-    // Closing on failure would look exactly like success, and the project is still there.
-    try {
-      await api.deleteProject(project.id);
-    } catch (err) {
-      setDangerError(errorText(err));
-      return;
-    }
-    onOpenChange(false);
-    onDeleted();
+    await act.run('delete', async () => {
+      // Closing on failure would look exactly like success, and the project is still there.
+      try {
+        await api.deleteProject(project.id);
+      } catch (err) {
+        setDangerError(errorText(err));
+        return;
+      }
+      onOpenChange(false);
+      onDeleted();
+    });
   };
   const leave = async () => {
     if (
@@ -195,15 +203,17 @@ export function SettingsDialog({
       }))
     )
       return;
-    setLeaveError(null);
-    try {
-      await api.leaveProject(project.id);
-      onOpenChange(false);
-      onLeft();
-    } catch (err) {
-      // A sole owner can't leave — spell out the way out rather than the raw invariant.
-      setLeaveError(err instanceof ApiError && err.code === 'last_owner' ? t('soleOwnerCantLeave') : errorText(err));
-    }
+    await act.run('leave', async () => {
+      setLeaveError(null);
+      try {
+        await api.leaveProject(project.id);
+        onOpenChange(false);
+        onLeft();
+      } catch (err) {
+        // A sole owner can't leave — spell out the way out rather than the raw invariant.
+        setLeaveError(err instanceof ApiError && err.code === 'last_owner' ? t('soleOwnerCantLeave') : errorText(err));
+      }
+    });
   };
 
   return (
@@ -239,7 +249,8 @@ export function SettingsDialog({
                   />
                   <Button
                     size="sm"
-                    disabled={!nameDraft.trim() || nameDraft.trim() === project.name || renaming}
+                    disabled={!nameDraft.trim() || nameDraft.trim() === project.name || act.locked}
+                    busy={act.busy === 'rename'}
                     onClick={saveName}
                   >
                     {t('save')}
@@ -252,6 +263,7 @@ export function SettingsDialog({
                   aria-label="project-group"
                   className={cn(selectCls, 'mt-1 w-full')}
                   value={groupId ?? ''}
+                  disabled={act.locked}
                   onChange={(e) => {
                     const next = e.target.value || null;
                     setGroupId(next);
@@ -273,16 +285,16 @@ export function SettingsDialog({
           {active === 'members' &&
             (membersDenied ? (
               <p className="p-3 text-[14px] text-muted">{t('needOwner')}</p>
+            ) : members === null ? (
+              <SkeletonRows rows={3} className="p-1" />
             ) : (
-              members !== null && (
-                <Members
-                  projectId={project.id}
-                  meId={meId}
-                  canManage={canManage}
-                  members={members}
-                  reload={loadMembers}
-                />
-              )
+              <Members
+                projectId={project.id}
+                meId={meId}
+                canManage={canManage}
+                members={members}
+                reload={loadMembers}
+              />
             ))}
 
           {active === 'export' && (
@@ -300,15 +312,30 @@ export function SettingsDialog({
                 {t('exportReleasedOnly')}
               </label>
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => runExport('yaml', stripExt)}>
+                <Button
+                  size="sm"
+                  disabled={act.locked}
+                  busy={act.busy === 'export:yaml'}
+                  onClick={() => void runExport('yaml', stripExt)}
+                >
                   {t('export')} .yaml
                 </Button>
-                <Button size="sm" onClick={() => runExport('json', stripExt)}>
+                <Button
+                  size="sm"
+                  disabled={act.locked}
+                  busy={act.busy === 'export:json'}
+                  onClick={() => void runExport('json', stripExt)}
+                >
                   {t('export')} .json
                 </Button>
               </div>
               <div className="border-t border-border pt-3">
-                <Button size="sm" onClick={() => runExport('html', false)}>
+                <Button
+                  size="sm"
+                  disabled={act.locked}
+                  busy={act.busy === 'export:html'}
+                  onClick={() => void runExport('html', false)}
+                >
                   {t('export')} .html
                 </Button>
               </div>
@@ -327,7 +354,12 @@ export function SettingsDialog({
                 aria-label="replace-spec-file"
                 onChange={onReplaceFile}
               />
-              <Button size="sm" onClick={() => replaceRef.current?.click()}>
+              <Button
+                size="sm"
+                disabled={act.locked}
+                busy={act.busy === 'replace'}
+                onClick={() => replaceRef.current?.click()}
+              >
                 {t('overwriteImport')}
               </Button>
               <ErrorText error={replaceError} />
@@ -339,7 +371,13 @@ export function SettingsDialog({
               {canManage && (
                 <div className="space-y-2">
                   <p className="text-[14px] text-muted">{t('dangerHint')}</p>
-                  <Button size="sm" className="border-delete text-delete hover:bg-delete/10" onClick={remove}>
+                  <Button
+                    size="sm"
+                    className="border-delete text-delete hover:bg-delete/10"
+                    disabled={act.locked}
+                    busy={act.busy === 'delete'}
+                    onClick={remove}
+                  >
                     {t('deleteProject')}
                   </Button>
                   <ErrorText error={dangerError} />
@@ -348,7 +386,13 @@ export function SettingsDialog({
               {isMember && (
                 <div className="space-y-2">
                   <p className="text-[14px] text-muted">{t('leaveHint')}</p>
-                  <Button size="sm" className="border-delete text-delete hover:bg-delete/10" onClick={leave}>
+                  <Button
+                    size="sm"
+                    className="border-delete text-delete hover:bg-delete/10"
+                    disabled={act.locked}
+                    busy={act.busy === 'leave'}
+                    onClick={leave}
+                  >
                     {t('leaveProject')}
                   </Button>
                   <ErrorText error={leaveError} />

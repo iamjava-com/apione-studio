@@ -16,6 +16,7 @@ import { api, token, type AuthUser, type Project } from './api';
 import { isUnsaved } from './lib/unsaved';
 import { navigate, routes, projectIdOf, isAdminRoute, useLocation, setBeforeLeave } from './lib/router';
 import { RegisterCommandsContext } from './lib/command-registry';
+import { PaneLoading } from './components/ui/pane-loading';
 
 export function App() {
   const { t } = useTranslation();
@@ -142,7 +143,7 @@ export function App() {
   }, [projects, activeId, t]);
   const allCommands = useMemo(() => [...commands, ...viewCommands], [commands, viewCommands]);
 
-  if (!ready) return <div className="h-full bg-bg" />;
+  if (!ready) return <PaneLoading className="h-full bg-bg" />;
   if (!user)
     return (
       <AuthScreen

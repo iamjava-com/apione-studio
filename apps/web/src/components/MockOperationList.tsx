@@ -6,6 +6,7 @@ import { cn, toggleInSet } from '../lib/utils';
 import { Input } from './ui/input';
 import { MethodBadge } from './ui/method-badge';
 import { groupByTag, matchesEndpointFilter } from '../lib/endpoint-outline';
+import { SkeletonRows } from './ui/skeleton';
 
 /**
  * The Mock canvas's endpoint picker. Deliberately mirrors the design outline — same filter, same
@@ -35,7 +36,7 @@ export function MockOperationList({
     return groupByTag(ops, catalog?.tagOrder ?? []);
   }, [catalog, filter]);
 
-  if (!catalog) return <div className="p-3 text-[13px] text-muted">{t('loading')}</div>;
+  if (!catalog) return <SkeletonRows rows={4} height="h-7" className="p-3" />;
 
   const toggle = (tag: string) => setCollapsed((prev) => toggleInSet(prev, tag));
 
