@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import Editor from '@monaco-editor/react';
 import YAML from 'yaml';
-import { api, type MockSchema } from '../api';
+import { api } from '../api';
 import '../monaco-setup'; // configures Monaco on import; this view is where that cost belongs
 import { EDITOR_FONT } from '../lib/editor-font';
 import { useTheme } from '../theme';
 import { Button } from './ui/button';
 import { Dialog } from './ui/dialog';
+import { useResource } from '../hooks/useResource';
+import { errorText } from '../lib/errors';
 import { PaneLoading } from './ui/pane-loading';
 
 /**
@@ -34,23 +36,17 @@ export function MockSchemaDialog({
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
-  const [data, setData] = useState<MockSchema | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const schema = useResource(() => api.mockSchema(projectId, method, path), [open, projectId, method, path], {
+    enabled: open,
+    keepPrevious: false,
+  });
+  const data = schema.data ?? null;
+  const error = schema.error ? errorText(schema.error) : null;
 
   const yaml = useMemo(() => (data?.schema == null ? '' : YAML.stringify(data.schema)), [data]);
   // Monaco can't size to its content, so the dialog would either clip a short schema in a
   // half-empty box or let a long one push the viewport.
   const height = Math.min(Math.max(yaml.split('\n').length * 19 + 16, 96), 440);
-
-  useEffect(() => {
-    if (!open) return;
-    setData(null);
-    setError(null);
-    api
-      .mockSchema(projectId, method, path)
-      .then(setData)
-      .catch((e) => setError((e as Error).message));
-  }, [open, projectId, method, path]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={t('mockSchemaTitle')} size="lg">

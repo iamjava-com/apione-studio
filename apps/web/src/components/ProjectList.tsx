@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DndContext,
@@ -18,6 +18,7 @@ import { toggleInSet } from '../lib/utils';
 import { useConfirm } from './ConfirmProvider';
 import { useDialogForm } from '../hooks/useDialogForm';
 import { useBusy } from '../hooks/useBusy';
+import { useResource } from '../hooks/useResource';
 import { Input } from './ui/input';
 import { Dialog } from './ui/dialog';
 import { DialogFooter } from './ui/DialogFooter';
@@ -43,10 +44,15 @@ function loadCollapsed(): Set<string> {
 export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void; isAdmin: boolean }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const list = useResource(() => Promise.all([api.listProjects(), api.listGroups()]), []);
+  const groups = list.data?.[1] ?? [];
+  // A drop re-files the card at once; the server's next answer supersedes the guess either way.
+  const [moved, setMoved] = useState<{ id: string; groupId: string | null } | null>(null);
+  useEffect(() => setMoved(null), [list.data]);
+  const projects = useMemo(
+    () => (list.data?.[0] ?? []).map((p) => (moved && p.id === moved.id ? { ...p, groupId: moved.groupId } : p)),
+    [list.data, moved],
+  );
   const act = useBusy();
   const [fileOver, setFileOver] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
@@ -59,20 +65,6 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
   // Rename and create share one dialog: `editing` is the group being renamed, or 'new'.
   const [editing, setEditing] = useState<Group | 'new' | null>(null);
   const dragDepth = useRef(0); // dragenter/leave fire per child; count so the hint doesn't flicker
-
-  const refresh = () => {
-    Promise.all([api.listProjects(), api.listGroups()])
-      .then(([ps, gs]) => {
-        setProjects(ps);
-        setGroups(gs);
-        setLoaded(true);
-      })
-      .catch((e: unknown) => {
-        setError(errorText(e));
-        setLoaded(true);
-      });
-  };
-  useEffect(refresh, []);
 
   const openCreate = (groupId: string | null, file: File | null = null) => {
     setCreateIn(groupId);
@@ -104,13 +96,13 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
     const groupId = overId === 'ungrouped' ? null : overId.slice('group:'.length);
     const project = projects.find((p) => p.id === id);
     if (!project || project.groupId === groupId) return;
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, groupId } : p))); // optimistic
-    setError(null);
+    setMoved({ id, groupId });
+    act.clearError();
     try {
       await api.updateProject(id, { groupId });
     } catch (e) {
-      setError(errorText(e));
-      refresh(); // back to the server's truth
+      act.fail(`move:${id}`, errorText(e));
+      list.reload(); // back to the server's truth
     }
   };
 
@@ -123,7 +115,7 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
     if (creating) return; // dialog is open — its own dropzone owns the drop
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    setError(null);
+    act.clearError();
     openCreate(null, file);
   };
   const onDragOver = (e: React.DragEvent) => {
@@ -140,18 +132,13 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
 
   const duplicate = (p: Project) =>
     act.run(`dup:${p.id}`, async () => {
-      setError(null);
-      try {
-        const text = await api.exportSpec(p.id, 'yaml').catch((e) => {
-          if (e instanceof ApiError && e.status === 404) return null; // never-saved project → empty copy
-          throw e;
-        });
-        const copy = await api.createProject(t('copyOfName', { name: p.name }), p.groupId);
-        if (text) await api.importSpec(copy.id, text);
-        refresh();
-      } catch (e) {
-        setError(errorText(e));
-      }
+      const text = await api.exportSpec(p.id, 'yaml').catch((e) => {
+        if (e instanceof ApiError && e.status === 404) return null; // never-saved project → empty copy
+        throw e;
+      });
+      const copy = await api.createProject(t('copyOfName', { name: p.name }), p.groupId);
+      if (text) await api.importSpec(copy.id, text);
+      list.reload();
     });
 
   const removeGroup = async (g: Group) => {
@@ -160,13 +147,8 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
     )
       return;
     await act.run(`del:${g.id}`, async () => {
-      setError(null);
-      try {
-        await api.deleteGroup(g.id);
-        refresh();
-      } catch (e) {
-        setError(errorText(e));
-      }
+      await api.deleteGroup(g.id);
+      list.reload();
     });
   };
 
@@ -176,7 +158,7 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
     ...groups.map((g) => ({ group: g, projects: projects.filter((p) => p.groupId === g.id) })),
   ];
   // Nothing at all to show — not even an empty group to file into.
-  const blank = loaded && projects.length === 0 && groups.length === 0 && !error;
+  const blank = list.data !== undefined && projects.length === 0 && groups.length === 0 && !list.error;
 
   return (
     <div
@@ -206,9 +188,12 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
             <Plus size={16} />
           </button>
         </div>
-        <ErrorText error={error} className="mb-3 text-[14px]" />
+        <ErrorText
+          error={act.error?.text ?? (list.error ? errorText(list.error) : null)}
+          className="mb-3 text-[14px]"
+        />
 
-        {!loaded ? (
+        {list.data === undefined ? (
           <Delayed>
             <div aria-busy className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
@@ -283,7 +268,7 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
         initialFile={droppedFile}
         onCreated={onOpen}
       />
-      <GroupDialog target={editing} onClose={() => setEditing(null)} onSaved={refresh} />
+      <GroupDialog target={editing} onClose={() => setEditing(null)} onSaved={list.reload} />
     </div>
   );
 }

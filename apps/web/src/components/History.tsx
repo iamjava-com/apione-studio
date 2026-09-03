@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, type BreakingReport, type VersionMeta } from '../api';
-import { errorText } from '../lib/errors';
 import { cn } from '../lib/utils';
+import { useBusy } from '../hooks/useBusy';
+import { useResource } from '../hooks/useResource';
 import { Button } from './ui/button';
 import { PaneLoading } from './ui/pane-loading';
 import { SkeletonRows } from './ui/skeleton';
@@ -61,8 +62,10 @@ export function History({
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
   const focusApplied = useRef(false);
-  const [versions, setVersions] = useState<VersionMeta[] | null>(null);
-  const [head, setHead] = useState(0); // the current version number
+  const versions = useResource(() => api.listVersions(projectId, path), [projectId, path]);
+  const head = versions.data?.currentVersion ?? 0;
+  // A failed read shows no versions at all: a list that may be another file's is worse than none.
+  const versionList = versions.status === 'error' ? [] : versions.data?.versions;
   const [target, setTarget] = useState<number | null>(null); // version being inspected (right side)
   const [base, setBase] = useState<number | 'prev'>('prev'); // compare against (left side)
   const [baseText, setBaseText] = useState<string | null>(null);
@@ -70,30 +73,18 @@ export function History({
   const [changes, setChanges] = useState<BreakingReport | null>(null);
   const [expandAll, setExpandAll] = useState(false);
   const [fileDiff, setFileDiff] = useState(false); // the whole-file text diff instead of the changelog
-  const [restoreError, setRestoreError] = useState<string | null>(null);
-  const [restoring, setRestoring] = useState(false);
+  const act = useBusy();
   const [comparing, setComparing] = useState(false); // a base→target fetch is in flight
 
   const baseNo = target != null ? (base === 'prev' ? target - 1 : base) : 0;
   const hasBase = target != null && baseNo >= 1;
 
-  const load = useCallback(() => {
-    api
-      .listVersions(projectId, path)
-      .then((r) => {
-        setVersions(r.versions);
-        setHead(r.currentVersion);
-        if (!focusApplied.current) {
-          setTarget(r.currentVersion || null); // default: inspect the latest save
-          setBase('prev');
-        }
-      })
-      .catch(() => {
-        setVersions([]);
-        if (!focusApplied.current) setTarget(null);
-      });
-  }, [projectId, path]);
-  useEffect(load, [load]);
+  // Each answer re-seeds the comparison — unless an external request already set it.
+  useEffect(() => {
+    if (versions.status === 'loading' || focusApplied.current) return;
+    setTarget(versions.status === 'error' ? null : versions.data?.currentVersion || null); // default: the latest save
+    setBase('prev');
+  }, [versions.status, versions.data]);
 
   // A new file resets the "did an external request set the comparison?" latch.
   useEffect(() => {
@@ -145,38 +136,30 @@ export function History({
   }, [projectId, path, target, baseNo, hasBase]);
 
   const restore = async (n: number) => {
-    if (restoring) return;
     const message = dirty ? t('restoreConfirmDirty') : '';
     if (!(await confirm({ title: t('restoreConfirmTitle', { v: n }), message, confirmLabel: t('restore') }))) return;
-    // Reloading the editor on a failed restore would show the file unchanged and call it done.
-    setRestoreError(null);
-    setRestoring(true);
-    try {
+    await act.run('restore', async () => {
+      // Reloading the editor on a failed restore would show the file unchanged and call it done.
       await api.restoreVersion(projectId, path, n);
-    } catch (err) {
-      setRestoreError(errorText(err));
-      return;
-    } finally {
-      setRestoring(false);
-    }
-    onRestored();
-    load();
+      onRestored();
+      versions.reload();
+    });
   };
 
-  const olderThanTarget = (versions ?? []).filter((v) => target != null && v.versionNo < target);
+  const olderThanTarget = (versionList ?? []).filter((v) => target != null && v.versionNo < target);
   // The text diff is the fallback when the engine is missing, and a choice otherwise.
   const showText = changes != null && (!changes.available || fileDiff);
 
   return (
     <div className="flex h-full flex-col">
-      {restoreError && (
-        <div className="border-b border-delete bg-delete/10 px-3 py-2 text-[13px] text-delete">{restoreError}</div>
+      {act.error && (
+        <div className="border-b border-delete bg-delete/10 px-3 py-2 text-[13px] text-delete">{act.error.text}</div>
       )}
       {/* version list (spine) — click a row to inspect it */}
       <div className="max-h-44 overflow-auto border-b border-border">
-        {versions === null && <SkeletonRows rows={3} height="h-7" className="p-3" />}
-        {versions?.length === 0 && <p className="p-3 text-[14px] text-muted">—</p>}
-        {(versions ?? []).map((v) => (
+        {versionList === undefined && <SkeletonRows rows={3} height="h-7" className="p-3" />}
+        {versionList?.length === 0 && <p className="p-3 text-[14px] text-muted">—</p>}
+        {(versionList ?? []).map((v) => (
           <button
             key={v.versionNo}
             onClick={() => {
@@ -239,7 +222,7 @@ export function History({
             )}
             <div className="flex-1" />
             {target < head && (
-              <Button size="sm" busy={restoring} onClick={() => void restore(target)}>
+              <Button size="sm" busy={act.busy === 'restore'} onClick={() => void restore(target)}>
                 {t('restoreTo', { v: target })}
               </Button>
             )}

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Users } from 'lucide-react';
 import { api, type AuthUser, type Member } from '../api';
-import { errorText } from '../lib/errors';
 import { useConfirm } from './ConfirmProvider';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -10,6 +9,7 @@ import { ErrorText } from './ui/ErrorText';
 import { selectCls } from './ui/select';
 import { useCombobox } from '../hooks/useCombobox';
 import { useBusy } from '../hooks/useBusy';
+import { useResource } from '../hooks/useResource';
 import { ImportMembersDialog } from './ImportMembersDialog';
 
 const ROLES = ['owner', 'editor', 'tester', 'viewer'];
@@ -124,45 +124,30 @@ export function Members({
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
-  const [users, setUsers] = useState<AuthUser[]>([]);
+  // The directory only feeds the add-member picker.
+  const users = useResource(() => api.listUsers(), [canManage], { enabled: canManage });
   const [selected, setSelected] = useState<AuthUser | null>(null);
   const [role, setRole] = useState('viewer');
-  const [error, setError] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
   const act = useBusy();
-
-  useEffect(() => {
-    if (!canManage) return; // the directory only feeds the add-member picker
-    api
-      .listUsers()
-      .then(setUsers)
-      .catch(() => {});
-  }, [canManage]);
 
   const memberIds = new Set(members.map((m) => m.userId));
 
   const add = () => {
     if (!selected) return;
     void act.run('add', async () => {
-      setError(null);
-      try {
-        await api.addMember(projectId, selected.username, role);
-        setSelected(null);
-        reload();
-      } catch (e) {
-        setError(errorText(e));
-      }
+      await api.addMember(projectId, selected.username, role);
+      setSelected(null);
+      reload();
     });
   };
   const changeRole = (m: Member, next: string) =>
     act.run(`role:${m.userId}`, async () => {
-      setError(null);
       try {
         await api.updateMemberRole(projectId, m.userId, next);
-      } catch (e) {
-        setError(errorText(e));
+      } finally {
+        reload(); // the server's answer either way — success or the value it kept
       }
-      reload(); // the server's answer either way — success or the value it kept
     });
   const remove = async (m: Member) => {
     if (
@@ -174,13 +159,8 @@ export function Members({
     )
       return;
     await act.run(`rm:${m.userId}`, async () => {
-      setError(null);
-      try {
-        await api.removeMember(projectId, m.userId);
-        reload();
-      } catch (e) {
-        setError(errorText(e));
-      }
+      await api.removeMember(projectId, m.userId);
+      reload();
     });
   };
   const owners = members.filter((m) => m.role === 'owner').length;
@@ -190,7 +170,7 @@ export function Members({
       {canManage && (
         <>
           <div className="flex gap-1.5">
-            <UserPicker users={users} memberIds={memberIds} value={selected} onSelect={setSelected} />
+            <UserPicker users={users.data ?? []} memberIds={memberIds} value={selected} onSelect={setSelected} />
             <select
               aria-label={t('roleCol')}
               className={selectCls}
@@ -212,7 +192,7 @@ export function Members({
           </Button>
         </>
       )}
-      <ErrorText error={error} />
+      <ErrorText error={act.error?.text ?? null} />
       {members.length === 0 && <p className="text-[14px] text-muted">—</p>}
       {members.map((m) => {
         const disabled = m.status === 'disabled';

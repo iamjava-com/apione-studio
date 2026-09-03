@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, token, type AuthUser } from '../api';
-import { errorText } from '../lib/errors';
+import { useBusy } from '../hooks/useBusy';
 import { LocaleThemeControls } from './LocaleThemeControls';
 import { Logo } from './Logo';
 import { Button } from './ui/button';
@@ -16,24 +16,18 @@ export function AuthScreen({ needsSetup, onAuthed }: { needsSetup: boolean; onAu
   const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const act = useBusy();
   const userRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => userRef.current?.focus(), []);
 
-  const submit = async () => {
-    if (!username.trim() || !password || busy) return;
-    setError(null);
-    setBusy(true);
-    try {
+  const submit = () => {
+    if (!username.trim() || !password) return;
+    void act.run('auth', async () => {
       const r = needsSetup ? await api.register(username.trim(), password) : await api.login(username.trim(), password);
       if (r.token) token.set(r.token);
       onAuthed(r.user);
-    } catch (e) {
-      setError(errorText(e));
-      setBusy(false);
-    }
+    });
   };
 
   return (
@@ -70,13 +64,13 @@ export function AuthScreen({ needsSetup, onAuthed }: { needsSetup: boolean; onAu
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-          <ErrorText error={error} />
+          <ErrorText error={act.error?.text ?? null} />
           <Button
             aria-label="auth-submit"
             variant="brand"
             className="w-full"
             disabled={!username.trim() || !password}
-            busy={busy}
+            busy={act.locked}
             onClick={submit}
           >
             {needsSetup ? t('setupAdmin') : t('login')}

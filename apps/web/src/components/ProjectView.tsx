@@ -8,8 +8,8 @@ import { useProjectData } from '../hooks/useProjectData';
 import { useRevisit } from '../hooks/useRevisit';
 import { useDebounced } from '../hooks/useDebounced';
 import { useParsedDoc } from '../hooks/useParsedDoc';
+import { useBusy } from '../hooks/useBusy';
 import { cn } from '../lib/utils';
-import { errorText } from '../lib/errors';
 import { SpecEditor } from './SpecEditor';
 import { OutlinePanel } from './OutlinePanel';
 import { OperationStagesProvider } from './OperationStages';
@@ -62,7 +62,7 @@ export function ProjectView({
   const [tool, setTool] = useState<Tool | null>(null); // right inspect panel; null = collapsed
   const [historyFocus, setHistoryFocus] = useState<{ base: number; target: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [fileError, setFileError] = useState<string | null>(null);
+  const fileAct = useBusy(); // the file list's own actions; `busy` names the path being deleted
 
   const { files, perms, roleLoaded, graph, lint, mockCatalog, mockDrafts, setMockDrafts, reloadMockCatalog, refresh } =
     useProjectData(project.id);
@@ -205,23 +205,14 @@ export function ProjectView({
     },
     [project.id, mode],
   );
-  const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const removeFile = async (path: string) => {
-    if (deletingPath) return;
     if (!(await confirm({ message: t('confirmDeleteFile', { path }), confirmLabel: t('delete'), danger: true })))
       return;
-    setFileError(null);
-    setDeletingPath(path);
-    try {
+    await fileAct.run(path, async () => {
       await api.deleteFile(project.id, path);
-    } catch (err) {
-      setFileError(errorText(err));
-      return;
-    } finally {
-      setDeletingPath(null);
-    }
-    if (activePath === path) setActivePath('openapi.yaml');
-    refresh();
+      if (activePath === path) setActivePath('openapi.yaml');
+      refresh();
+    });
   };
 
   // Design and Mock share the operation selection, so they sit next to each other; Docs renders
@@ -259,8 +250,10 @@ export function ProjectView({
         </Button>
       </div>
 
-      {fileError && (
-        <div className="border-b border-delete bg-delete/10 px-3 py-2 text-[13px] text-delete">{fileError}</div>
+      {fileAct.error && (
+        <div className="border-b border-delete bg-delete/10 px-3 py-2 text-[13px] text-delete">
+          {fileAct.error.text}
+        </div>
       )}
       {/* Keyed on mode so switching tabs is itself a way out — the header above stays usable,
           which is what lets someone reach the YAML view and see what the document actually says. */}
@@ -298,7 +291,7 @@ export function ProjectView({
                         activePath={activePath}
                         onSelectFile={(path) => void switchFile(path)}
                         onDeleteFile={(path) => void removeFile(path)}
-                        deletingPath={deletingPath}
+                        deletingPath={fileAct.busy}
                       />
                     </Panel>
                     <ResizeHandle />

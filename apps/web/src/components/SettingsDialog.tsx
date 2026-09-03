@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError, type ExportFormat, type Group, type Member, type Project } from '../api';
-import { errorText } from '../lib/errors';
+import { api, ApiError, type ExportFormat, type Project } from '../api';
 import { useConfirm } from './ConfirmProvider';
 import { useBusy } from '../hooks/useBusy';
+import { useResource } from '../hooks/useResource';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { ErrorText } from './ui/ErrorText';
@@ -67,46 +67,22 @@ export function SettingsDialog({
   const [stripExt, setStripExt] = useState(false);
   const [releasedOnly, setReleasedOnly] = useState(false);
   const replaceRef = useRef<HTMLInputElement>(null);
-  const [replaceError, setReplaceError] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState(project.name);
-  const [renameError, setRenameError] = useState<string | null>(null);
-  // One action at a time across every section: a second click lands on a disabled button.
+  // One action at a time across every section: a second click lands on a disabled button. Each
+  // section shows the error of its own action (`errorFor`).
   const act = useBusy();
-  const [leaveError, setLeaveError] = useState<string | null>(null);
-  const [dangerError, setDangerError] = useState<string | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [groups, setGroups] = useState<Group[]>([]);
+  const groups = useResource(() => api.listGroups(), [open, canManage], { enabled: open && canManage });
   // Owned here rather than in the roster panel: it also decides whether the caller has an exit,
   // and two copies of one list are two chances to disagree.
-  const [members, setMembers] = useState<Member[] | null>(null);
+  const membersRes = useResource(() => api.listMembers(project.id), [open, project.id, canReadMembers], {
+    enabled: open && canReadMembers,
+  });
   // Distinct from an empty roster: an empty list reads as "nobody is on this project".
-  const [membersDenied, setMembersDenied] = useState(false);
-  const loadMembers = useCallback(() => {
-    if (!canReadMembers) return;
-    api
-      .listMembers(project.id)
-      .then((m) => {
-        setMembers(m);
-        setMembersDenied(false);
-      })
-      .catch((e: unknown) => {
-        if (e instanceof ApiError && e.status === 403) setMembersDenied(true);
-        setMembers([]);
-      });
-  }, [project.id, canReadMembers]);
-  useEffect(() => {
-    if (open) loadMembers();
-  }, [open, loadMembers]);
+  const membersDenied = membersRes.error instanceof ApiError && membersRes.error.status === 403;
+  const members = membersRes.status === 'error' ? [] : (membersRes.data ?? null);
   // Optimistic so the select doesn't snap back while the project list re-reads.
   const [groupId, setGroupId] = useState<string | null>(project.groupId);
   useEffect(() => setGroupId(project.groupId), [project.groupId]);
-  useEffect(() => {
-    if (!open || !canManage) return;
-    api
-      .listGroups()
-      .then(setGroups)
-      .catch(() => {});
-  }, [open, canManage]);
   const isMember = members !== null && members.some((m) => m.userId === meId);
 
   const sections: { id: Section; label: string }[] = [
@@ -122,38 +98,21 @@ export function SettingsDialog({
   const active: Section = sections.some((s) => s.id === section) ? section : (sections[0]?.id ?? 'export');
 
   const runExport = (format: ExportFormat, strip: boolean) =>
-    act.run(`export:${format}`, async () => {
-      setExportError(null);
-      try {
-        await download(project, format, { stripExt: strip, releasedOnly });
-      } catch (err) {
-        setExportError(errorText(err));
-      }
-    });
+    act.run(`export:${format}`, () => download(project, format, { stripExt: strip, releasedOnly }));
 
   const saveName = () => {
     const name = nameDraft.trim();
     if (!name || name === project.name) return;
-    void act.run('rename', async () => {
-      setRenameError(null);
-      try {
-        await api.updateProject(project.id, { name });
-        onRenamed();
-      } catch (err) {
-        setRenameError(errorText(err));
-      }
+    void act.run('general:rename', async () => {
+      await api.updateProject(project.id, { name });
+      onRenamed();
     });
   };
 
   const moveToGroup = (groupId: string | null) =>
-    act.run('group', async () => {
-      setRenameError(null);
-      try {
-        await api.updateProject(project.id, { groupId });
-        onRenamed(); // same refresh path — the list re-reads the project either way
-      } catch (err) {
-        setRenameError(errorText(err));
-      }
+    act.run('general:group', async () => {
+      await api.updateProject(project.id, { groupId });
+      onRenamed(); // same refresh path — the list re-reads the project either way
     });
 
   const onReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,14 +121,9 @@ export function SettingsDialog({
     if (!file) return;
     if (!(await confirm({ message: t('replaceConfirm'), confirmLabel: t('overwriteImport'), danger: true }))) return;
     await act.run('replace', async () => {
-      setReplaceError(null);
-      try {
-        await api.importSpec(project.id, await file.text());
-        onReplaced();
-        onOpenChange(false);
-      } catch (err) {
-        setReplaceError(errorText(err));
-      }
+      await api.importSpec(project.id, await file.text());
+      onReplaced();
+      onOpenChange(false);
     });
   };
   const remove = async () => {
@@ -184,12 +138,7 @@ export function SettingsDialog({
       return;
     await act.run('delete', async () => {
       // Closing on failure would look exactly like success, and the project is still there.
-      try {
-        await api.deleteProject(project.id);
-      } catch (err) {
-        setDangerError(errorText(err));
-        return;
-      }
+      await api.deleteProject(project.id);
       onOpenChange(false);
       onDeleted();
     });
@@ -204,15 +153,14 @@ export function SettingsDialog({
     )
       return;
     await act.run('leave', async () => {
-      setLeaveError(null);
       try {
         await api.leaveProject(project.id);
-        onOpenChange(false);
-        onLeft();
       } catch (err) {
         // A sole owner can't leave — spell out the way out rather than the raw invariant.
-        setLeaveError(err instanceof ApiError && err.code === 'last_owner' ? t('soleOwnerCantLeave') : errorText(err));
+        throw err instanceof ApiError && err.code === 'last_owner' ? new Error(t('soleOwnerCantLeave')) : err;
       }
+      onOpenChange(false);
+      onLeft();
     });
   };
 
@@ -250,7 +198,7 @@ export function SettingsDialog({
                   <Button
                     size="sm"
                     disabled={!nameDraft.trim() || nameDraft.trim() === project.name || act.locked}
-                    busy={act.busy === 'rename'}
+                    busy={act.busy === 'general:rename'}
                     onClick={saveName}
                   >
                     {t('save')}
@@ -271,14 +219,14 @@ export function SettingsDialog({
                   }}
                 >
                   <option value="">{t('ungrouped')}</option>
-                  {groups.map((g) => (
+                  {(groups.data ?? []).map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
                     </option>
                   ))}
                 </select>
               </label>
-              <ErrorText error={renameError} />
+              <ErrorText error={act.errorFor('general')} />
             </div>
           )}
 
@@ -293,7 +241,7 @@ export function SettingsDialog({
                 meId={meId}
                 canManage={canManage}
                 members={members}
-                reload={loadMembers}
+                reload={membersRes.reload}
               />
             ))}
 
@@ -339,7 +287,7 @@ export function SettingsDialog({
                   {t('export')} .html
                 </Button>
               </div>
-              <ErrorText error={exportError} />
+              <ErrorText error={act.errorFor('export')} />
             </div>
           )}
 
@@ -362,7 +310,7 @@ export function SettingsDialog({
               >
                 {t('overwriteImport')}
               </Button>
-              <ErrorText error={replaceError} />
+              <ErrorText error={act.errorFor('replace')} />
             </div>
           )}
 
@@ -380,7 +328,7 @@ export function SettingsDialog({
                   >
                     {t('deleteProject')}
                   </Button>
-                  <ErrorText error={dangerError} />
+                  <ErrorText error={act.errorFor('delete')} />
                 </div>
               )}
               {isMember && (
@@ -395,7 +343,7 @@ export function SettingsDialog({
                   >
                     {t('leaveProject')}
                   </Button>
-                  <ErrorText error={leaveError} />
+                  <ErrorText error={act.errorFor('leave')} />
                 </div>
               )}
             </div>
