@@ -16,11 +16,14 @@ import { SkeletonRows } from './ui/skeleton';
  */
 export function MockOperationList({
   catalog,
+  failed,
   activeKey,
   dirtyKeys,
   onPick,
 }: {
   catalog: MockCatalog | null;
+  /** The catalog read failed: say so rather than wait for it. */
+  failed: boolean;
   activeKey: string | null;
   dirtyKeys: Set<string>;
   onPick: (o: MockOperation) => void;
@@ -36,6 +39,7 @@ export function MockOperationList({
     return groupByTag(ops, catalog?.tagOrder ?? []);
   }, [catalog, filter]);
 
+  if (failed) return <p className="p-3 text-[13px] text-delete">{t('mockCatalogFailed')}</p>;
   if (!catalog) return <SkeletonRows rows={4} height="h-7" className="p-3" />;
 
   const toggle = (tag: string) => setCollapsed((prev) => toggleInSet(prev, tag));

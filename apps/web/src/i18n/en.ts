@@ -110,6 +110,7 @@ export const en = {
   formatCode: 'Format',
   readOnly: 'Read-only',
   mockAutoActive: 'Auto mock is serving this endpoint',
+  mockCatalogFailed: 'The endpoint list could not be loaded.',
   mockViewSchema: 'View schema',
   mockEnableCustom: 'Enable custom mock',
   mockSchemaTitle: 'Response schema',
