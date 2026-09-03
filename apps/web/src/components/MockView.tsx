@@ -29,6 +29,7 @@ export function MockView({
   projectId,
   canWrite,
   catalog,
+  catalogFailed,
   reloadCatalog,
   selection,
   onSelect,
@@ -40,6 +41,8 @@ export function MockView({
   canWrite: boolean;
   /** Which operations can hold a mock. Owned by the workspace, like the drafts below. */
   catalog: MockCatalog | null;
+  /** The catalog could not be read, so the list has nothing to wait for. */
+  catalogFailed: boolean;
   /** Ask for a re-read after a write of our own; document writes the workspace handles itself. */
   reloadCatalog: () => void;
   selection: Selection;
@@ -96,6 +99,7 @@ export function MockView({
       <Panel defaultSize="22%" minSize="14%" collapsible collapsedSize="0%" className="bg-surface">
         <MockOperationList
           catalog={catalog}
+          failed={catalogFailed}
           activeKey={key}
           dirtyKeys={dirtyKeys}
           onPick={(o) => onSelect({ kind: 'op', method: o.method, path: o.path })}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type FileMeta, type GraphResult, type LintResult, type MockCatalog, type Permission } from '../api';
 import { keepOnly } from '../lib/utils';
-import { useLatestOnly } from './useLatestOnly';
+import { useResource } from './useResource';
 
 /**
  * Everything the workspace reads about a project but does not edit: its files, the caller's
@@ -18,10 +18,13 @@ export interface ProjectData {
   files: FileMeta[];
   /** null until the first read; callers may answer optimistically while it is. */
   perms: Permission[] | null;
+  /** True once the project has answered, well or badly: the gate on what the canvas shows. */
   roleLoaded: boolean;
   graph: GraphResult | null;
   lint: LintResult | null;
   mockCatalog: MockCatalog | null;
+  /** The catalog read failed (no mock:read, or the spec will not bundle) — as opposed to still out. */
+  mockCatalogFailed: boolean;
   mockDrafts: Record<string, string>;
   setMockDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   reloadMockCatalog: () => void;
@@ -29,57 +32,48 @@ export interface ProjectData {
 }
 
 export function useProjectData(projectId: string): ProjectData {
-  const [files, setFiles] = useState<FileMeta[]>([]);
-  const [perms, setPerms] = useState<Permission[] | null>(null);
-  const [roleLoaded, setRoleLoaded] = useState(false);
-  const [graph, setGraph] = useState<GraphResult | null>(null);
-  const [lint, setLint] = useState<LintResult | null>(null);
-  const [mockCatalog, setMockCatalog] = useState<MockCatalog | null>(null);
+  const project = useResource(() => api.getProject(projectId), [projectId]);
+  const files = useResource(() => api.listFiles(projectId), [projectId]);
+  const graph = useResource(() => api.graph(projectId), [projectId]);
+  const lint = useResource(() => api.lint(projectId), [projectId]);
+  const catalog = useResource(() => api.mockCatalog(projectId), [projectId]);
   const [mockDrafts, setMockDrafts] = useState<Record<string, string>>({});
 
-  const latest = useLatestOnly();
+  // A draft is the unsaved half of a mock, so it goes wherever the server's pruning went. Only an
+  // answer prunes: a failed read is not a verdict on which operations still exist.
+  useEffect(() => {
+    if (!catalog.data) return;
+    const live = new Set(catalog.data.operations.map((o) => o.opId));
+    setMockDrafts((d) => keepOnly(d, live));
+  }, [catalog.data]);
 
-  const reloadMockCatalog = useCallback(() => {
-    latest.read(
-      'mock',
-      api.mockCatalog(projectId),
-      (c) => {
-        setMockCatalog(c);
-        // A draft is the unsaved half of a mock, so it goes wherever the server's pruning went.
-        const live = new Set(c.operations.map((o) => o.opId));
-        setMockDrafts((d) => keepOnly(d, live));
-      },
-      () => setMockCatalog(null), // no mock:read, or the spec won't bundle — nothing to reconcile
-    );
-  }, [projectId, latest]);
-
+  const { reload: reloadProject } = project;
+  const { reload: reloadFiles } = files;
+  const { reload: reloadGraph } = graph;
+  const { reload: reloadLint } = lint;
+  const { reload: reloadCatalog } = catalog;
   const refresh = useCallback(() => {
-    reloadMockCatalog();
-    latest.read('files', api.listFiles(projectId), setFiles, () => setFiles([]));
-    latest.read('graph', api.graph(projectId), setGraph, () => setGraph(null));
-    latest.read('lint', api.lint(projectId), setLint, () => setLint(null));
-    latest.read(
-      'project',
-      api.getProject(projectId),
-      (p) => {
-        if (p.permissions) setPerms(p.permissions);
-        setRoleLoaded(true);
-      },
-      () => setRoleLoaded(true),
-    );
-  }, [projectId, reloadMockCatalog, latest]);
-  useEffect(refresh, [refresh]);
+    reloadProject();
+    reloadFiles();
+    reloadGraph();
+    reloadLint();
+    reloadCatalog();
+  }, [reloadProject, reloadFiles, reloadGraph, reloadLint, reloadCatalog]);
+
+  // A derived view that failed to build shows as absent, not as the last one that did.
+  const answered = <T>(r: { status: string; data: T | undefined }) => (r.status === 'error' ? undefined : r.data);
 
   return {
-    files,
-    perms,
-    roleLoaded,
-    graph,
-    lint,
-    mockCatalog,
+    files: answered(files) ?? [],
+    perms: project.data?.permissions ?? null,
+    roleLoaded: project.data !== undefined || project.status === 'error',
+    graph: answered(graph) ?? null,
+    lint: answered(lint) ?? null,
+    mockCatalog: answered(catalog) ?? null,
+    mockCatalogFailed: catalog.status === 'error',
     mockDrafts,
     setMockDrafts,
-    reloadMockCatalog,
+    reloadMockCatalog: reloadCatalog,
     refresh,
   };
 }

@@ -64,8 +64,19 @@ export function ProjectView({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const fileAct = useBusy(); // the file list's own actions; `busy` names the path being deleted
 
-  const { files, perms, roleLoaded, graph, lint, mockCatalog, mockDrafts, setMockDrafts, reloadMockCatalog, refresh } =
-    useProjectData(project.id);
+  const {
+    files,
+    perms,
+    roleLoaded,
+    graph,
+    lint,
+    mockCatalog,
+    mockCatalogFailed,
+    mockDrafts,
+    setMockDrafts,
+    reloadMockCatalog,
+    refresh,
+  } = useProjectData(project.id);
   const mockDirty = Object.keys(mockDrafts).length > 0;
 
   const onSaved = () => {
@@ -372,6 +383,7 @@ export function ProjectView({
                 projectId={project.id}
                 canWrite={canMockWrite}
                 catalog={mockCatalog}
+                catalogFailed={mockCatalogFailed}
                 reloadCatalog={reloadMockCatalog}
                 selection={selection}
                 onSelect={select}
