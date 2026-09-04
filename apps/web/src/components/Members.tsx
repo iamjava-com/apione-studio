@@ -64,7 +64,7 @@ function UserPicker({
         <ChevronDown size={14} className={cn('shrink-0 text-faint transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-40 mt-1 max-h-64 w-full min-w-44 overflow-auto rounded-md border border-border bg-surface p-1 shadow-lg">
+        <div className="absolute left-0 top-full z-40 mt-1 max-h-64 w-full min-w-44 animate-drop-in overflow-auto rounded-md border border-border bg-surface p-1 shadow-lg">
           <input
             ref={inputRef}
             aria-label={`${t('selectUser')}-search`}
