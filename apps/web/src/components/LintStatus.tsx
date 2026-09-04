@@ -50,7 +50,7 @@ export function LintStatus({ lint }: { lint: LintResult | null }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-80 space-y-1.5 overflow-auto rounded-md border border-border bg-surface p-2 shadow-lg">
+          <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-80 animate-drop-in space-y-1.5 overflow-auto rounded-md border border-border bg-surface p-2 shadow-lg">
             {lint.problems.map((p, i) => {
               const where = humanizePointer(p.location);
               return (

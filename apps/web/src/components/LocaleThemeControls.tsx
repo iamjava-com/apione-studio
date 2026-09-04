@@ -26,7 +26,7 @@ export function LocaleThemeControls() {
         <Button variant="ghost" size="icon" aria-label="switch-language">
           <Globe size={15} />
         </Button>
-        <div className="invisible absolute right-0 top-full z-30 min-w-28 rounded-md border border-border bg-surface p-1 shadow-lg group-hover:visible group-focus-within:visible">
+        <div className="invisible absolute right-0 top-full z-30 min-w-28 -translate-y-1 rounded-md border border-border bg-surface p-1 opacity-0 shadow-lg transition-[opacity,translate,visibility] duration-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
           {LOCALES.map((l) => (
             <button
               key={l.code}

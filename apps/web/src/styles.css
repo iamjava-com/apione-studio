@@ -41,6 +41,30 @@
     'JetBrains Mono Variable', ui-monospace, 'SF Mono', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei',
     'Noto Sans CJK SC', monospace;
 
+  /* Overlay entrances. Enter only: leaving is instant so nothing waits on it. Keyframes animate
+     `transform`, which composes with the `translate` utilities that center a dialog. */
+  --ease-settle: cubic-bezier(0.2, 0, 0, 1);
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-settle-in: settle-in 150ms var(--ease-settle);
+  --animate-drop-in: drop-in 120ms var(--ease-settle);
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes settle-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+  }
+  @keyframes drop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
   /* "Saved vN" holds, then goes — the fade is what lets it leave without a click. */
   --animate-linger: linger 2s ease-in forwards;
   @keyframes linger {

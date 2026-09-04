@@ -203,7 +203,7 @@ export function App() {
               @{user.username}
               {user.role === 'admin' && <span className="text-brand">{t('roleAdmin')}</span>}
             </button>
-            <div className="invisible absolute right-0 top-full z-30 min-w-28 rounded-md border border-border bg-surface p-1 shadow-lg group-hover:visible group-focus-within:visible">
+            <div className="invisible absolute right-0 top-full z-30 min-w-28 -translate-y-1 rounded-md border border-border bg-surface p-1 opacity-0 shadow-lg transition-[opacity,translate,visibility] duration-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
               <button
                 onClick={() => setTokensOpen(true)}
                 className="block w-full whitespace-nowrap rounded px-2 py-1 text-left text-[14px] text-muted hover:bg-raised hover:text-text"

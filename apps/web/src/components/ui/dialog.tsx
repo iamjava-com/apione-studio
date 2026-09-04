@@ -36,7 +36,7 @@ export function Dialog({
             can land in either order and the overlay may end up painting over the dialog. Keeping
             them in one node with `isolate` makes the pair a self-contained stacking context. */}
         <div className="pointer-events-none fixed inset-0 z-50 isolate">
-          <DialogPrimitive.Overlay className="pointer-events-auto absolute inset-0 bg-black/40" />
+          <DialogPrimitive.Overlay className="pointer-events-auto absolute inset-0 animate-fade-in bg-black/40" />
           <DialogPrimitive.Content
             aria-describedby={undefined}
             onCloseAutoFocus={onCloseAutoFocus}
@@ -44,7 +44,7 @@ export function Dialog({
             onInteractOutside={(e) => {
               if (!dismissOnOutside || (e.target as Element | null)?.closest?.('[role="dialog"]')) e.preventDefault();
             }}
-            className={`pointer-events-auto absolute left-1/2 top-1/2 z-10 w-full ${size === 'lg' ? 'max-w-2xl' : 'max-w-sm'} -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-5 shadow-2xl focus:outline-none`}
+            className={`pointer-events-auto absolute left-1/2 top-1/2 z-10 w-full ${size === 'lg' ? 'max-w-2xl' : 'max-w-sm'} -translate-x-1/2 -translate-y-1/2 animate-settle-in rounded-xl border border-border bg-surface p-5 shadow-2xl focus:outline-none`}
           >
             <div className="mb-3 flex items-center justify-between gap-4">
               <DialogPrimitive.Title className="text-[15px] font-semibold text-text">{title}</DialogPrimitive.Title>

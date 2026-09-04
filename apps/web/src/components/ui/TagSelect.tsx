@@ -100,7 +100,7 @@ export function TagSelect({
           <div
             ref={popupRef}
             style={popupStyle}
-            className="z-50 min-w-44 overflow-auto rounded-md border border-border bg-surface p-1 shadow-lg"
+            className="z-50 min-w-44 animate-drop-in overflow-auto rounded-md border border-border bg-surface p-1 shadow-lg"
           >
             <input
               autoFocus

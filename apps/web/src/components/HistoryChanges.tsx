@@ -33,7 +33,7 @@ function BreakingSummary({ group }: { group: ChangeGroup }) {
         ⚠ {t('errors', { count: errors })} · {t('warnings', { count: breaking.length - errors })}
       </button>
       {openList && (
-        <ul className="absolute left-3 right-3 z-10 mt-1 max-h-56 space-y-1.5 overflow-auto rounded-md border border-border bg-surface p-2 shadow-lg">
+        <ul className="absolute left-3 right-3 z-10 mt-1 max-h-56 animate-drop-in space-y-1.5 overflow-auto rounded-md border border-border bg-surface p-2 shadow-lg">
           {breaking.map((c, i) => (
             <li
               key={i}
