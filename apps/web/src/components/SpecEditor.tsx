@@ -1,15 +1,16 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LintResult, Project } from '../api';
 import type { SpecFile } from '../hooks/useSpecFile';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { FormView } from './FormView';
+import { lazyView } from '../lib/lazy-view';
 // Monaco is several megabytes and the form is the default view, so the login screen and the form
 // should not carry it. Pointing at the YAML toggle starts the fetch, so the click that follows
 // rarely waits for the chunk.
 const loadYamlView = () => import('./YamlView');
-const YamlView = lazy(() => loadYamlView().then((m) => ({ default: m.YamlView })));
+const YamlView = lazyView(() => loadYamlView().then((m) => ({ default: m.YamlView })));
 import { LintStatus } from './LintStatus';
 import { EditorPlaceholder } from './ui/editor-placeholder';
 import { PaneLoading } from './ui/pane-loading';

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Group, Panel, type GroupImperativeHandle } from 'react-resizable-panels';
 import { Clock, Settings, X } from 'lucide-react';
@@ -25,11 +25,12 @@ import { ResizeHandle } from './ui/resize-handle';
 import { ErrorBoundary } from './ErrorBoundary';
 import { HTTP_METHODS } from './form/constants';
 import { PaneLoading } from './ui/pane-loading';
+import { lazyView } from '../lib/lazy-view';
 
 // Both pull a heavy engine — Scalar its own renderer, MockView the Monaco editor — and neither is
 // on the path to the project someone just opened.
-const ScalarDocs = lazy(() => import('./ScalarDocs').then((m) => ({ default: m.ScalarDocs })));
-const MockView = lazy(() => import('./MockView').then((m) => ({ default: m.MockView })));
+const ScalarDocs = lazyView(() => import('./ScalarDocs').then((m) => ({ default: m.ScalarDocs })));
+const MockView = lazyView(() => import('./MockView').then((m) => ({ default: m.MockView })));
 
 type Tool = 'history';
 // Percentages of the workspace group; the panels' size props say the same numbers.
