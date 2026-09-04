@@ -98,7 +98,7 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
       <DialogPrimitive.Portal>
         {/* One wrapper, one portal — see ui/dialog.tsx for why the pair must not be split. */}
         <div className="pointer-events-none fixed inset-0 z-[100000] isolate">
-          <DialogPrimitive.Overlay className="pointer-events-auto absolute inset-0 bg-black/40" />
+          <DialogPrimitive.Overlay className="pointer-events-auto absolute inset-0 animate-fade-in bg-black/40" />
           <DialogPrimitive.Content
             aria-describedby={undefined}
             // Radix would focus the panel itself; keep focus on the search input instead.
@@ -106,7 +106,7 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
               e.preventDefault();
               inputRef.current?.focus();
             }}
-            className="pointer-events-auto absolute left-1/2 top-[12vh] z-10 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface shadow-2xl focus:outline-none"
+            className="pointer-events-auto absolute left-1/2 top-[12vh] z-10 w-full max-w-lg -translate-x-1/2 animate-drop-in overflow-hidden rounded-lg border border-border bg-surface shadow-2xl focus:outline-none"
           >
             <DialogPrimitive.Title className="sr-only">{t('cmdkPlaceholder')}</DialogPrimitive.Title>
             <input
