@@ -59,6 +59,8 @@ export const ja: Record<keyof TranslationKeys, string> = {
   viewCrashedTitle: 'このビューを表示できません',
   viewCrashedHint:
     'ドキュメントの構造がエディタの想定と異なる場合がほとんどです。未保存の変更は残っています——再試行するか、YAML タブでファイルを直接確認してください。',
+  viewUnloadedTitle: 'このビューを読み込めませんでした',
+  viewUnloadedHint: '接続を確認してページを再読み込みしてください。',
   newBuildTitle: '新しいバージョンの準備ができました',
   newBuildHint: '再読み込みで適用されます。',
   viewDiff: '差分を表示',
