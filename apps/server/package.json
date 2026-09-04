@@ -26,7 +26,7 @@
     "argon2": "^0.44.0",
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
-    "fastify": "^5.8.5",
+    "fastify": "^5.12.3",
     "quickjs-emscripten": "^0.32.0",
     "swagger2openapi": "^7.0.8",
     "yaml": "2.9.0"
