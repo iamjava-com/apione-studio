@@ -15,7 +15,7 @@ function rootFileName(projectId: string): string {
   for (const name of ROOT_CANDIDATES) {
     if (fs.existsSync(vault.fileAbsPath(project.id, name))) return name;
   }
-  throw new NotFoundError(`no root spec file (${ROOT_CANDIDATES.join(' / ')}) found in project`);
+  throw new NotFoundError(`no root spec file (${ROOT_CANDIDATES.join(' / ')}) found in project`, 'spec_missing');
 }
 
 function rootFileAbs(projectId: string): string {

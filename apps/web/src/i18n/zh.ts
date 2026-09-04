@@ -114,6 +114,7 @@ export const zh: Record<keyof TranslationKeys, string> = {
   readOnly: '只读',
   mockAutoActive: '自动 Mock 生效中',
   mockCatalogFailed: '接口列表加载失败。',
+  mockNoSpec: '请先保存设计。',
   mockViewSchema: '查看 Schema',
   mockEnableCustom: '启用自定义 Mock',
   mockSchemaTitle: '响应 Schema',

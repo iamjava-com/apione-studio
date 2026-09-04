@@ -117,6 +117,7 @@ export const ja: Record<keyof TranslationKeys, string> = {
   readOnly: '読み取り専用',
   mockAutoActive: '自動 Mock が有効です',
   mockCatalogFailed: 'エンドポイント一覧を読み込めませんでした。',
+  mockNoSpec: 'まずデザインを保存してください。',
   mockViewSchema: 'Schema を見る',
   mockEnableCustom: 'カスタム Mock を有効化',
   mockSchemaTitle: 'レスポンス Schema',

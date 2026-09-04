@@ -4,6 +4,7 @@ import { Group, Panel } from 'react-resizable-panels';
 import { HelpCircle, WandSparkles } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import type { MockCatalog, MockMode, MockOperation } from '../api';
+import type { MockCatalogError } from '../hooks/useProjectData';
 import '../monaco-setup'; // configures Monaco on import; this view is where that cost belongs
 import { EDITOR_FONT } from '../lib/editor-font';
 import { useTheme } from '../theme';
@@ -29,7 +30,7 @@ export function MockView({
   projectId,
   canWrite,
   catalog,
-  catalogFailed,
+  catalogError,
   reloadCatalog,
   selection,
   onSelect,
@@ -41,8 +42,8 @@ export function MockView({
   canWrite: boolean;
   /** Which operations can hold a mock. Owned by the workspace, like the drafts below. */
   catalog: MockCatalog | null;
-  /** The catalog could not be read, so the list has nothing to wait for. */
-  catalogFailed: boolean;
+  /** Why there is no catalog, so the list has nothing to wait for; null while it may still come. */
+  catalogError: MockCatalogError | null;
   /** Ask for a re-read after a write of our own; document writes the workspace handles itself. */
   reloadCatalog: () => void;
   selection: Selection;
@@ -99,7 +100,7 @@ export function MockView({
       <Panel defaultSize="22%" minSize="14%" collapsible collapsedSize="0%" className="bg-surface">
         <MockOperationList
           catalog={catalog}
-          failed={catalogFailed}
+          error={catalogError}
           activeKey={key}
           dirtyKeys={dirtyKeys}
           onPick={(o) => onSelect({ kind: 'op', method: o.method, path: o.path })}

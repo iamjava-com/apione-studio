@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, type FileMeta, type GraphResult, type LintResult, type MockCatalog, type Permission } from '../api';
+import {
+  api,
+  ApiError,
+  type FileMeta,
+  type GraphResult,
+  type LintResult,
+  type MockCatalog,
+  type Permission,
+} from '../api';
 import { keepOnly } from '../lib/utils';
 import { useResource } from './useResource';
 
@@ -14,6 +22,11 @@ import { useResource } from './useResource';
  * Keeping them out of MockView is deliberate — switching modes unmounts that view, and an unsaved
  * mock must survive that.
  */
+/** Why there is no mock catalog once the read has answered: 'missing' when the project has no
+ *  saved spec yet, 'failed' for anything else (no mock:read — a 404 too, on purpose — or a spec
+ *  that will not bundle). */
+export type MockCatalogError = 'missing' | 'failed';
+
 export interface ProjectData {
   files: FileMeta[];
   /** null until the first read; callers may answer optimistically while it is. */
@@ -23,8 +36,7 @@ export interface ProjectData {
   graph: GraphResult | null;
   lint: LintResult | null;
   mockCatalog: MockCatalog | null;
-  /** The catalog read failed (no mock:read, or the spec will not bundle) — as opposed to still out. */
-  mockCatalogFailed: boolean;
+  mockCatalogError: MockCatalogError | null;
   mockDrafts: Record<string, string>;
   setMockDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   reloadMockCatalog: () => void;
@@ -70,7 +82,12 @@ export function useProjectData(projectId: string): ProjectData {
     graph: answered(graph) ?? null,
     lint: answered(lint) ?? null,
     mockCatalog: answered(catalog) ?? null,
-    mockCatalogFailed: catalog.status === 'error',
+    mockCatalogError:
+      catalog.status !== 'error'
+        ? null
+        : catalog.error instanceof ApiError && catalog.error.code === 'spec_missing'
+          ? 'missing'
+          : 'failed',
     mockDrafts,
     setMockDrafts,
     reloadMockCatalog: reloadCatalog,

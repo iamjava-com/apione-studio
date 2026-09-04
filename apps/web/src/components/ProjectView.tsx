@@ -72,7 +72,7 @@ export function ProjectView({
     graph,
     lint,
     mockCatalog,
-    mockCatalogFailed,
+    mockCatalogError,
     mockDrafts,
     setMockDrafts,
     reloadMockCatalog,
@@ -384,7 +384,7 @@ export function ProjectView({
                 projectId={project.id}
                 canWrite={canMockWrite}
                 catalog={mockCatalog}
-                catalogFailed={mockCatalogFailed}
+                catalogError={mockCatalogError}
                 reloadCatalog={reloadMockCatalog}
                 selection={selection}
                 onSelect={select}
