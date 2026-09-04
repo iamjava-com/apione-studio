@@ -7,6 +7,7 @@ import { Input } from './ui/input';
 import { MethodBadge } from './ui/method-badge';
 import { groupByTag, matchesEndpointFilter } from '../lib/endpoint-outline';
 import { SkeletonRows } from './ui/skeleton';
+import type { MockCatalogError } from '../hooks/useProjectData';
 
 /**
  * The Mock canvas's endpoint picker. Deliberately mirrors the design outline — same filter, same
@@ -16,14 +17,14 @@ import { SkeletonRows } from './ui/skeleton';
  */
 export function MockOperationList({
   catalog,
-  failed,
+  error,
   activeKey,
   dirtyKeys,
   onPick,
 }: {
   catalog: MockCatalog | null;
-  /** The catalog read failed: say so rather than wait for it. */
-  failed: boolean;
+  /** Why there is no catalog: a spec never saved, or a read that failed. Said, not waited for. */
+  error: MockCatalogError | null;
   activeKey: string | null;
   dirtyKeys: Set<string>;
   onPick: (o: MockOperation) => void;
@@ -39,7 +40,8 @@ export function MockOperationList({
     return groupByTag(ops, catalog?.tagOrder ?? []);
   }, [catalog, filter]);
 
-  if (failed) return <p className="p-3 text-[13px] text-delete">{t('mockCatalogFailed')}</p>;
+  if (error === 'missing') return <p className="p-3 text-[13px] text-muted">{t('mockNoSpec')}</p>;
+  if (error === 'failed') return <p className="p-3 text-[13px] text-delete">{t('mockCatalogFailed')}</p>;
   if (!catalog) return <SkeletonRows rows={4} height="h-7" className="p-3" />;
 
   const toggle = (tag: string) => setCollapsed((prev) => toggleInSet(prev, tag));

@@ -6,6 +6,7 @@ let projectSvc: typeof import('../src/services/project-service.js');
 let fileSvc: typeof import('../src/services/file-service.js');
 let mockSvc: typeof import('../src/services/mock-service.js');
 let gen: typeof import('../src/services/mock-generator.js');
+let catalogSvc: typeof import('../src/services/mock-catalog-service.js');
 let projectId: string; // the mock is addressed by project id (set in the first mock test)
 
 before(async () => {
@@ -14,6 +15,15 @@ before(async () => {
   fileSvc = await import('../src/services/file-service.js');
   mockSvc = await import('../src/services/mock-service.js');
   gen = await import('../src/services/mock-generator.js');
+  catalogSvc = await import('../src/services/mock-catalog-service.js');
+});
+
+test('catalog: a project with nothing saved yet says spec_missing, not a bare not_found', async () => {
+  const p = projectSvc.createProject('Unsaved');
+  await assert.rejects(
+    () => catalogSvc.getCatalog(p.id),
+    (e: unknown) => (e as { code?: string }).code === 'spec_missing',
+  );
 });
 
 test('generator: example wins, then enum, then type/format defaults', () => {

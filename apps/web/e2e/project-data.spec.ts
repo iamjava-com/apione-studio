@@ -16,6 +16,14 @@ test('a failed project read leaves an editor on the design canvas', async ({ pag
   await expect(page.getByLabel('Title')).toBeEditable();
 });
 
+test('a never-saved project’s Mock tab asks for a save, not for patience', async ({ page }) => {
+  await authenticate(page);
+  await createProject(page, `E2E No Spec ${Date.now()}`);
+
+  await page.getByRole('button', { name: 'Mock', exact: true }).click();
+  await expect(page.getByText(msg('mockNoSpec'))).toBeVisible();
+});
+
 test('a failed mock catalog read says so instead of waiting', async ({ page }) => {
   await authenticate(page);
   await createProject(page, `E2E Catalog ${Date.now()}`);
