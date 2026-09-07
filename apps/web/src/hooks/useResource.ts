@@ -9,6 +9,10 @@ export interface Resource<T> {
    *  often a state of its own, not a failure. */
   error: unknown;
   reload: () => void;
+  /** Rewrite the answer locally — an optimistic guess. An answer already in flight predates the
+   *  guess and is dropped; follow the request with `reload()` whichever way it ends, so the
+   *  server's answer settles what is on screen. */
+  mutate: (fn: (data: T) => T) => void;
 }
 
 /**
@@ -30,13 +34,19 @@ export function useResource<T>(
   deps: DependencyList,
   { keepPrevious = true, enabled = true }: { keepPrevious?: boolean; enabled?: boolean } = {},
 ): Resource<T> {
-  const [state, setState] = useState<Omit<Resource<T>, 'reload'>>({ status: 'loading', data: undefined, error: null });
+  const [state, setState] = useState<Omit<Resource<T>, 'reload' | 'mutate'>>({
+    status: 'loading',
+    data: undefined,
+    error: null,
+  });
   const [round, setRound] = useState(0);
   const ticket = useRef(0);
   // Read at fetch time, so an inline fetcher does not have to be in `deps`.
   const fetcherRef = useRef(fetcher);
+  const hasData = useRef(false);
   useEffect(() => {
     fetcherRef.current = fetcher;
+    hasData.current = state.data !== undefined;
   });
 
   useEffect(() => {
@@ -56,5 +66,10 @@ export function useResource<T>(
   }, [...deps, round, enabled, keepPrevious]);
 
   const reload = useCallback(() => setRound((n) => n + 1), []);
-  return { ...state, reload };
+  const mutate = useCallback((fn: (data: T) => T) => {
+    if (!hasData.current) return; // nothing to rewrite, and the first answer must still land
+    ticket.current += 1;
+    setState((s) => ({ status: 'ready', data: fn(s.data as T), error: null }));
+  }, []);
+  return { ...state, reload, mutate };
 }
