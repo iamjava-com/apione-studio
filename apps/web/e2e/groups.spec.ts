@@ -1,5 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { authenticate, createProject, drag } from './helpers';
+
+async function createGroup(page: Page, name: string) {
+  await page.getByLabel('New group').click();
+  await page.getByLabel('group-name').fill(name);
+  await page.getByRole('button', { name: 'Create' }).click();
+  const band = page.locator('section').filter({ has: page.getByRole('heading', { name }) });
+  await expect(band).toBeVisible();
+  return band;
+}
 
 // Grouping is organisation only: filing a project changes where it sits, never who can reach it,
 // and deleting a group must leave its projects standing.
@@ -15,13 +24,8 @@ test('a project can be filed under a group, and deleting the group keeps it', as
   // Created it → own it, so the card says so.
   await expect(page.getByRole('button').filter({ hasText: projectName }).getByLabel('Owner')).toBeVisible();
 
-  await page.getByLabel('New group').click();
-  await page.getByLabel('group-name').fill(groupName);
-  await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.getByRole('heading', { name: groupName })).toBeVisible();
-
   // An empty group keeps its band — it is the place you file things into, so it must be reachable.
-  const band = page.locator('section').filter({ has: page.getByRole('heading', { name: groupName }) });
+  const band = await createGroup(page, groupName);
   await expect(band.getByRole('button', { name: 'New project here', exact: true })).toBeVisible();
   // The ungrouped band stays headerless — the project is on the page but outside the group.
   await expect(band.getByText(projectName, { exact: true })).toHaveCount(0);
@@ -60,11 +64,7 @@ test('a project can be dragged into a group and back out, and a group folds away
   await createProject(page, projectName);
 
   await page.goto('/');
-  await page.getByLabel('New group').click();
-  await page.getByLabel('group-name').fill(groupName);
-  await page.getByRole('button', { name: 'Create' }).click();
-  const band = page.locator('section').filter({ has: page.getByRole('heading', { name: groupName }) });
-  await expect(band).toBeVisible();
+  const band = await createGroup(page, groupName);
 
   const card = page.getByRole('button').filter({ hasText: projectName });
 
@@ -89,6 +89,76 @@ test('a project can be dragged into a group and back out, and a group folds away
   await drag(page, card, ungrouped);
   await expect(band.getByText(projectName, { exact: true })).toHaveCount(0);
   await expect(ungrouped.getByText(projectName, { exact: true })).toBeVisible();
+});
+
+// Each drop is shown at once and stands on its own: filing a second project must not undo the
+// first one on screen while the server already holds both.
+test('two drags in a row both stay where they were dropped', async ({ page }) => {
+  await authenticate(page);
+  const stamp = Date.now();
+  const first = `DA ${stamp}`;
+  const second = `DB ${stamp}`;
+  const groupName = `DD ${stamp}`;
+
+  await createProject(page, first);
+  await page.goto('/');
+  await createProject(page, second);
+
+  await page.goto('/');
+  const band = await createGroup(page, groupName);
+
+  await drag(page, page.getByRole('button').filter({ hasText: first }), band);
+  await expect(band.getByText(first, { exact: true })).toBeVisible();
+  await drag(page, page.getByRole('button').filter({ hasText: second }), band);
+  await expect(band.getByText(second, { exact: true })).toBeVisible();
+  await expect(band.getByText(first, { exact: true })).toBeVisible();
+});
+
+// A drop made while the list is being re-read must outlive that read: its answer predates the
+// drop, so landing it would snap the card back until the drop's own re-read arrives.
+test('a drop during a list re-read is not undone by that read', async ({ page }) => {
+  await authenticate(page);
+  const stamp = Date.now();
+  const first = `RA ${stamp}`;
+  const second = `RB ${stamp}`;
+  const groupName = `RG ${stamp}`;
+
+  await createProject(page, first);
+  await page.goto('/');
+  await createProject(page, second);
+
+  await page.goto('/');
+  const band = await createGroup(page, groupName);
+
+  // Hold the list re-read that follows the first drop, and the second drop's own write.
+  let releaseRead: () => void = () => {};
+  const readHeld = new Promise<void>((r) => (releaseRead = r));
+  let releaseWrite: () => void = () => {};
+  const writeHeld = new Promise<void>((r) => (releaseWrite = r));
+  let reads = 0;
+  await page.route('**/api/projects', async (route) => {
+    if (route.request().method() === 'GET' && ++reads === 1) await readHeld;
+    await route.continue();
+  });
+  await page.route('**/api/projects/*', async (route) => {
+    if (route.request().method() === 'PATCH' && reads >= 1) await writeHeld;
+    await route.continue();
+  });
+
+  await drag(page, page.getByRole('button').filter({ hasText: first }), band);
+  await expect(band.getByText(first, { exact: true })).toBeVisible();
+  await drag(page, page.getByRole('button').filter({ hasText: second }), band);
+  await expect(band.getByText(second, { exact: true })).toBeVisible();
+
+  // The stale read lands now: it knows the first drop, not the second.
+  releaseRead();
+  await page.waitForResponse((r) => r.url().endsWith('/api/projects') && r.request().method() === 'GET');
+  await expect(band.getByText(second, { exact: true })).toBeVisible();
+  await expect(band.getByText(first, { exact: true })).toBeVisible();
+
+  releaseWrite();
+  await page.waitForResponse((r) => r.request().method() === 'PATCH');
+  await expect(band.getByText(second, { exact: true })).toBeVisible();
 });
 
 // The picker only offers projects whose roster the caller may already read; choosing one takes
