@@ -5,6 +5,7 @@ import type { BreakingChange } from '../api';
 import { useParsedDoc } from '../hooks/useParsedDoc';
 import { cn } from '../lib/utils';
 import { DiffPane } from './DiffPane';
+import { Popover } from './ui/popover';
 import { groupChanges, type ChangeGroup } from './history/changes';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -21,30 +22,31 @@ function subtree(doc: any, g: ChangeGroup): string {
 /** One line: does this change break a client? Clicking it floats oasdiff's own words. */
 function BreakingSummary({ group }: { group: ChangeGroup }) {
   const { t } = useTranslation();
-  const [openList, setOpenList] = useState(false);
   const breaking = group.changes.filter((c) => c.level !== 'info');
   const errors = breaking.filter((c) => c.level === 'error').length;
   if (breaking.length === 0) {
     return <p className="px-3 pb-1.5 text-[12px] text-post">✓ {t('breakingNone')}</p>;
   }
   return (
-    <div className="relative px-3 pb-1.5 text-[12px]">
-      <button className="text-put underline-offset-2 hover:underline" onClick={() => setOpenList((x) => !x)}>
-        ⚠ {t('errors', { count: errors })} · {t('warnings', { count: breaking.length - errors })}
-      </button>
-      {openList && (
-        <ul className="absolute left-3 right-3 z-10 mt-1 max-h-56 animate-drop-in space-y-1.5 overflow-auto rounded-md border border-border bg-surface p-2 shadow-lg">
-          {breaking.map((c, i) => (
-            <li
-              key={i}
-              className="rounded border-l-2 py-0.5 pl-2 text-text"
-              style={{ borderColor: c.level === 'error' ? 'var(--color-delete)' : 'var(--color-put)' }}
-            >
-              {c.text}
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="px-3 pb-1.5 text-[12px]">
+      <Popover
+        panel="left-0 right-0 max-h-56"
+        trigger={(toggle) => (
+          <button className="text-put underline-offset-2 hover:underline" onClick={toggle}>
+            ⚠ {t('errors', { count: errors })} · {t('warnings', { count: breaking.length - errors })}
+          </button>
+        )}
+      >
+        {breaking.map((c, i) => (
+          <div
+            key={i}
+            className="rounded border-l-2 py-0.5 pl-2 text-text"
+            style={{ borderColor: c.level === 'error' ? 'var(--color-delete)' : 'var(--color-put)' }}
+          >
+            {c.text}
+          </div>
+        ))}
+      </Popover>
     </div>
   );
 }
