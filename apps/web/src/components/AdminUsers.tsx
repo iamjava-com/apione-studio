@@ -15,7 +15,7 @@ import { Dialog } from './ui/dialog';
 import { CopyButton } from './ui/CopyButton';
 import { DialogFooter } from './ui/DialogFooter';
 import { ErrorText } from './ui/ErrorText';
-import { Spinner } from './ui/spinner';
+import { IconButton } from './ui/icon-button';
 import { SkeletonRows } from './ui/skeleton';
 import { selectCls as baseSelect } from './ui/select';
 
@@ -146,48 +146,36 @@ export function AdminUsers({ meId }: { meId: string }) {
                   <td className="px-3 py-2 text-faint">{formatDate(u.createdAt, i18n.language)}</td>
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-1">
-                      <button
+                      <IconButton
                         aria-label={`reset-${u.username}`}
                         title={t('resetPassword')}
                         onClick={() => resetPw(u)}
                         disabled={act.locked}
-                        aria-busy={act.busy === `reset:${u.id}` || undefined}
-                        className="rounded p-1 text-faint transition-colors hover:bg-raised hover:text-text disabled:pointer-events-none"
+                        busy={act.busy === `reset:${u.id}`}
                       >
-                        {act.busy === `reset:${u.id}` ? <Spinner /> : <KeyRound size={14} />}
-                      </button>
-                      <button
+                        <KeyRound size={14} />
+                      </IconButton>
+                      <IconButton
                         aria-label={`${disabled ? 'enable' : 'disable'}-${u.username}`}
                         title={disabled ? t('enable') : t('disable')}
                         disabled={isSelf || act.locked}
-                        aria-busy={act.busy === `status:${u.id}` || undefined}
+                        busy={act.busy === `status:${u.id}`}
                         onClick={() => toggleStatus(u)}
-                        className={cn(
-                          'rounded p-1 text-faint transition-colors hover:bg-raised hover:text-text disabled:opacity-30 disabled:hover:bg-transparent',
-                          act.busy === `status:${u.id}` && 'disabled:opacity-100',
-                        )}
+                        className="disabled:opacity-30"
                       >
-                        {act.busy === `status:${u.id}` ? (
-                          <Spinner />
-                        ) : disabled ? (
-                          <Check size={14} />
-                        ) : (
-                          <Ban size={14} />
-                        )}
-                      </button>
-                      <button
+                        {disabled ? <Check size={14} /> : <Ban size={14} />}
+                      </IconButton>
+                      <IconButton
                         aria-label={`delete-${u.username}`}
                         title={t('delete')}
+                        tone="danger"
                         disabled={isSelf || act.locked}
-                        aria-busy={act.busy === `del:${u.id}` || undefined}
+                        busy={act.busy === `del:${u.id}`}
                         onClick={() => remove(u)}
-                        className={cn(
-                          'rounded p-1 text-faint transition-colors hover:text-delete disabled:opacity-30 disabled:hover:text-faint',
-                          act.busy === `del:${u.id}` && 'disabled:opacity-100',
-                        )}
+                        className="disabled:opacity-30"
                       >
-                        {act.busy === `del:${u.id}` ? <Spinner /> : <Trash2 size={14} />}
-                      </button>
+                        <Trash2 size={14} />
+                      </IconButton>
                     </div>
                   </td>
                 </tr>

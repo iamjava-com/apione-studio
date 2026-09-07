@@ -7,7 +7,7 @@ import { formatDate } from '../lib/format';
 import { useConfirm } from './ConfirmProvider';
 import { useDialogForm } from '../hooks/useDialogForm';
 import { Button } from './ui/button';
-import { Spinner } from './ui/spinner';
+import { IconButton } from './ui/icon-button';
 import { SkeletonRows } from './ui/skeleton';
 import { useBusy } from '../hooks/useBusy';
 import { useResource } from '../hooks/useResource';
@@ -108,16 +108,16 @@ export function ApiTokensDialog({ open, onOpenChange }: { open: boolean; onOpenC
                   : t('tokenNeverUsed')}
               </span>
               <span className="shrink-0 text-[12px] text-faint">{formatDate(tok.createdAt, i18n.language)}</span>
-              <button
+              <IconButton
                 aria-label={`revoke-${tok.name}`}
                 title={t('revoke')}
+                tone="danger"
                 onClick={() => revoke(tok)}
                 disabled={act.locked}
-                aria-busy={act.busy === `rm:${tok.id}` || undefined}
-                className="rounded p-1 text-faint transition-colors hover:text-delete disabled:pointer-events-none"
+                busy={act.busy === `rm:${tok.id}`}
               >
-                {act.busy === `rm:${tok.id}` ? <Spinner /> : <Trash2 size={14} />}
-              </button>
+                <Trash2 size={14} />
+              </IconButton>
             </li>
           ))}
         </ul>

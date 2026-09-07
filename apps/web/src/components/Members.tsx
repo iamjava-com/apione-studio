@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Users } from 'lucide-react';
+import { ChevronDown, Users, X } from 'lucide-react';
 import { api, type AuthUser, type Member } from '../api';
 import { useConfirm } from './ConfirmProvider';
 import { cn } from '../lib/utils';
@@ -232,7 +232,7 @@ export function Members({
                   title={lastOwner ? t('lastOwnerHint') : undefined}
                   onClick={() => remove(m)}
                 >
-                  ✕
+                  <X size={13} />
                 </Button>
               </>
             ) : (
