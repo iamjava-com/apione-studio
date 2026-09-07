@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0](https://github.com/iamjava-com/apione-studio/compare/v1.1.0...v1.2.0) (2026-09-07)
+
+
+### Features
+
+* dialogs, menus and the command palette arrive instead of popping ([#24](https://github.com/iamjava-com/apione-studio/issues/24)) ([31cdb39](https://github.com/iamjava-com/apione-studio/commit/31cdb394416d5e501c2834291d28e2a8ef2e0f29))
+* every wait shows itself on the control that started it ([#19](https://github.com/iamjava-com/apione-studio/issues/19)) ([d1098d0](https://github.com/iamjava-com/apione-studio/commit/d1098d01914fd84d62704af4801697df4efed7d5))
+
+
+### Bug Fixes
+
+* a never-saved project's Mock tab asks for a save, not for patience ([#23](https://github.com/iamjava-com/apione-studio/issues/23)) ([37f1a8b](https://github.com/iamjava-com/apione-studio/commit/37f1a8b3e1b21bb70153c4b5f446187e0a035f0a))
+* a second drag between groups no longer undoes the first on screen ([#28](https://github.com/iamjava-com/apione-studio/issues/28)) ([b02b13e](https://github.com/iamjava-com/apione-studio/commit/b02b13e69777983214f210ad8be6425b3f2dd8b7))
+* a view whose code fails to load says so instead of blaming the document ([#22](https://github.com/iamjava-com/apione-studio/issues/22)) ([7a39069](https://github.com/iamjava-com/apione-studio/commit/7a390699bfdf09b471e3c61a29609b2f26e472fe))
+* the breaking-changes list closes on a click elsewhere, like every popup ([#29](https://github.com/iamjava-com/apione-studio/issues/29)) ([0cd5a16](https://github.com/iamjava-com/apione-studio/commit/0cd5a16f89984822eb26c60d2d6bb74b3adeba50))
+
 ## [1.1.0](https://github.com/iamjava-com/apione-studio/compare/v1.0.4...v1.1.0) (2026-08-31)
 
 
