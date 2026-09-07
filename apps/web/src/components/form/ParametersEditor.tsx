@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Copy } from 'lucide-react';
+import { Copy, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { TagSelect } from '../ui/TagSelect';
@@ -182,9 +182,10 @@ export function ParametersEditor({ p, m, op, update }: { p: string; m: string; o
                           size="sm"
                           variant="ghost"
                           className="shrink-0"
+                          aria-label="remove-parameter"
                           onClick={() => mutateParams((a) => a.splice(i, 1))}
                         >
-                          ✕
+                          <X size={13} />
                         </Button>
                       </div>
                     )}

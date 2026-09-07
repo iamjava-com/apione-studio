@@ -3,7 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Group, Project } from '../../api';
 import { cn } from '../../lib/utils';
-import { Spinner } from '../ui/spinner';
+import { IconButton } from '../ui/icon-button';
 import { ProjectCard } from './ProjectCard';
 
 /**
@@ -46,7 +46,7 @@ export function GroupSection({
 }) {
   const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({ id: group ? `group:${group.id}` : 'ungrouped' });
-  const iconBtn = 'rounded p-0.5 text-faint opacity-0 transition-opacity hover:text-text group-hover/head:opacity-100';
+  const reveal = 'opacity-0 group-hover/head:opacity-100';
 
   return (
     <section
@@ -74,34 +74,38 @@ export function GroupSection({
               {projects.length}
             </span>
           </button>
-          <button
+          <IconButton
             aria-label={`${t('newProjectHere')}: ${group.name}`}
             title={t('newProjectHere')}
             onClick={onNewProject}
-            className={iconBtn}
+            size="sm"
+            className={reveal}
           >
             <Plus size={14} />
-          </button>
+          </IconButton>
           {group.canManage && (
             <>
-              <button
+              <IconButton
                 aria-label={`${t('renameGroup')}: ${group.name}`}
                 title={t('renameGroup')}
                 onClick={onRename}
-                className={iconBtn}
+                size="sm"
+                className={reveal}
               >
                 <Pencil size={13} />
-              </button>
-              <button
+              </IconButton>
+              <IconButton
                 aria-label={`${t('deleteGroup')}: ${group.name}`}
                 title={t('deleteGroup')}
+                tone="danger"
+                size="sm"
                 onClick={onDelete}
                 disabled={!!busy}
-                aria-busy={busy === `del:${group.id}` || undefined}
-                className={cn(iconBtn, 'hover:text-delete', busy === `del:${group.id}` && 'opacity-100')}
+                busy={busy === `del:${group.id}`}
+                className={reveal}
               >
-                {busy === `del:${group.id}` ? <Spinner size={13} /> : <Trash2 size={13} />}
-              </button>
+                <Trash2 size={13} />
+              </IconButton>
             </>
           )}
         </div>

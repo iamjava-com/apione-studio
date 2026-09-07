@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
-import { Plus, FileText, Search, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { Plus, FileText, Search, ChevronsDownUp, ChevronsUpDown, X } from 'lucide-react';
 import type { FileMeta, GraphResult } from '../api';
 import { cn, toggleInSet } from '../lib/utils';
 import { insertAfterKey } from './form/reorder';
@@ -16,7 +16,7 @@ import { NavGroup, NavItem } from './outline/nav';
 import { OpGroup, OpRows, type RowHandlers } from './outline/OperationRows';
 import { SchemaSection } from './outline/SchemaSection';
 import { cloneNode } from '../lib/clone';
-import { Spinner } from './ui/spinner';
+import { IconButton } from './ui/icon-button';
 import { SkeletonRows } from './ui/skeleton';
 
 type Doc = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -207,18 +207,19 @@ export function OutlinePanel({
                   {f.path}
                 </span>
                 <span className="font-mono text-[11px] text-faint">v{f.currentVersion}</span>
-                <button
+                <IconButton
                   aria-label={t('delete')}
+                  tone="danger"
+                  size="sm"
                   disabled={deletingPath !== null}
-                  aria-busy={deletingPath === f.path || undefined}
-                  className="text-faint hover:text-delete disabled:pointer-events-none"
+                  busy={deletingPath === f.path}
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteFile(f.path);
                   }}
                 >
-                  {deletingPath === f.path ? <Spinner size={12} /> : '✕'}
-                </button>
+                  <X size={13} />
+                </IconButton>
               </NavItem>
             ))}
           </NavGroup>
