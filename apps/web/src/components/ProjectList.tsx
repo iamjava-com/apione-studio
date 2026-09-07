@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DndContext,
@@ -45,14 +45,8 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
   const { t } = useTranslation();
   const confirm = useConfirm();
   const list = useResource(() => Promise.all([api.listProjects(), api.listGroups()]), []);
+  const projects = list.data?.[0] ?? [];
   const groups = list.data?.[1] ?? [];
-  // A drop re-files the card at once; the server's next answer supersedes the guess either way.
-  const [moved, setMoved] = useState<{ id: string; groupId: string | null } | null>(null);
-  useEffect(() => setMoved(null), [list.data]);
-  const projects = useMemo(
-    () => (list.data?.[0] ?? []).map((p) => (moved && p.id === moved.id ? { ...p, groupId: moved.groupId } : p)),
-    [list.data, moved],
-  );
   const act = useBusy();
   const [fileOver, setFileOver] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
@@ -96,13 +90,14 @@ export function ProjectList({ onOpen, isAdmin }: { onOpen: (p: Project) => void;
     const groupId = overId === 'ungrouped' ? null : overId.slice('group:'.length);
     const project = projects.find((p) => p.id === id);
     if (!project || project.groupId === groupId) return;
-    setMoved({ id, groupId });
+    list.mutate(([ps, gs]) => [ps.map((p) => (p.id === id ? { ...p, groupId } : p)), gs]);
     act.clearError();
     try {
       await api.updateProject(id, { groupId });
     } catch (e) {
       act.fail(`move:${id}`, errorText(e));
-      list.reload(); // back to the server's truth
+    } finally {
+      list.reload(); // the server's truth either way
     }
   };
 
