@@ -4,7 +4,7 @@ import { Copy, UserKey } from 'lucide-react';
 import type { Project } from '../../api';
 import { formatDate } from '../../lib/format';
 import { cn } from '../../lib/utils';
-import { Spinner } from '../ui/spinner';
+import { IconButton } from '../ui/icon-button';
 
 /**
  * One project tile. Draggable only when the caller could actually re-file it — a card that lifts
@@ -60,24 +60,21 @@ export function ProjectCard({
           </span>
         )}
       </div>
-      <button
+      <IconButton
         aria-label={t('duplicate')}
         title={t('duplicate')}
         disabled={locked}
-        aria-busy={duplicating || undefined}
+        busy={duplicating}
         // Stop the pointer here, or pressing Duplicate would start dragging the card instead.
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           onDuplicate(project);
         }}
-        className={cn(
-          'absolute right-2.5 top-2.5 rounded p-1 text-faint opacity-0 transition-opacity hover:text-text group-hover:opacity-100',
-          duplicating && 'opacity-100',
-        )}
+        className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100"
       >
-        {duplicating ? <Spinner /> : <Copy size={14} />}
-      </button>
+        <Copy size={14} />
+      </IconButton>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { X } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { CommitInput } from './CommitInput';
@@ -99,8 +100,13 @@ export function ResponsesEditor({
               <Button size="sm" aria-label="add-response-body" onClick={() => addContent(code)}>
                 + {t('body')}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => mutateResponses((r) => delete r[code])}>
-                ✕
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label="remove-response"
+                onClick={() => mutateResponses((r) => delete r[code])}
+              >
+                <X size={13} />
               </Button>
             </div>
             <ContentMapEditor

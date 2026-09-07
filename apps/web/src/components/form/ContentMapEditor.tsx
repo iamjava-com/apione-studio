@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { TagSelect } from '../ui/TagSelect';
 import { SchemaNode } from './SchemaNode';
@@ -59,7 +60,7 @@ export function ContentMapEditor({
             />
           </div>
           <Button size="sm" variant="ghost" aria-label={`remove-${kind}-body`} onClick={() => onRemove(ct)}>
-            ✕
+            <X size={13} />
           </Button>
         </div>
       ))}

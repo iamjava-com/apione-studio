@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Copy } from 'lucide-react';
+import { Copy, X } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { TagSelect } from '../ui/TagSelect';
@@ -210,8 +210,8 @@ export function ObjectPropertiesEditor({
                       <Button size="sm" variant="ghost" aria-label="duplicate-field" onClick={() => duplicateField(f)}>
                         <Copy size={13} />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => removeField(f)}>
-                        ✕
+                      <Button size="sm" variant="ghost" aria-label="remove-field" onClick={() => removeField(f)}>
+                        <X size={13} />
                       </Button>
                     </>
                   }
@@ -277,7 +277,7 @@ export function CompositionEditor({
             }
             trailing={
               <Button size="sm" variant="ghost" aria-label="remove-branch" onClick={() => removeBranch(i)}>
-                ✕
+                <X size={13} />
               </Button>
             }
             mutate={(fn) => mutate((n, root) => fn(n[ty][i], root))}
