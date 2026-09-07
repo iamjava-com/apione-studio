@@ -51,5 +51,14 @@ test('a removed endpoint opens to its breaking summary', async ({ page }) => {
   await expect(row).toContainText(msg('changeRemoved'));
   await row.click();
   await page.getByRole('button', { name: msg('errors', { count: 1 }), exact: false }).click();
-  await expect(page.getByText('api path removed', { exact: false })).toBeVisible();
+  const words = page.getByText('api path removed', { exact: false });
+  await expect(words).toBeVisible();
+  // The list is a popover: a click anywhere else dismisses it and still lands where it was aimed.
+  await page.getByLabel('outline-filter').click();
+  await expect(words).toBeHidden();
+  await expect(page.getByLabel('outline-filter')).toBeFocused();
+  await page.getByRole('button', { name: msg('errors', { count: 1 }), exact: false }).click();
+  await expect(words).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(words).toBeHidden();
 });

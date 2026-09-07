@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import type { LintResult } from '../api';
 import { HTTP_METHODS as METHOD_LIST } from './form/constants';
+import { Popover } from './ui/popover';
 
 const HTTP_METHODS = new Set(METHOD_LIST);
 
@@ -34,40 +34,36 @@ function humanizePointer(pointer: string | null): string | null {
  */
 export function LintStatus({ lint }: { lint: LintResult | null }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
   if (!lint || lint.errorCount === 0) return null;
 
   return (
-    <div className="relative">
-      <button
-        aria-label="lint-status"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-delete hover:bg-delete/10"
-      >
-        <AlertTriangle size={13} />
-        {t('structErrors', { count: lint.errorCount })}
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-80 animate-drop-in space-y-1.5 overflow-auto rounded-md border border-border bg-surface p-2 shadow-lg">
-            {lint.problems.map((p, i) => {
-              const where = humanizePointer(p.location);
-              return (
-                <div key={i} className="rounded border-l-2 border-delete py-1 pl-2 text-[13px]">
-                  <div className="text-text">{p.message}</div>
-                  {where && (
-                    <div className="truncate font-mono text-[11px] text-faint" title={p.location ?? ''}>
-                      {where}
-                    </div>
-                  )}
-                  <div className="mt-0.5 text-[10px] uppercase tracking-wide text-faint/70">{p.ruleId}</div>
-                </div>
-              );
-            })}
-          </div>
-        </>
+    <Popover
+      panel="left-0 max-h-72 w-80"
+      trigger={(toggle) => (
+        <button
+          aria-label="lint-status"
+          onClick={toggle}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-delete hover:bg-delete/10"
+        >
+          <AlertTriangle size={13} />
+          {t('structErrors', { count: lint.errorCount })}
+        </button>
       )}
-    </div>
+    >
+      {lint.problems.map((p, i) => {
+        const where = humanizePointer(p.location);
+        return (
+          <div key={i} className="rounded border-l-2 border-delete py-1 pl-2 text-[13px]">
+            <div className="text-text">{p.message}</div>
+            {where && (
+              <div className="truncate font-mono text-[11px] text-faint" title={p.location ?? ''}>
+                {where}
+              </div>
+            )}
+            <div className="mt-0.5 text-[10px] uppercase tracking-wide text-faint/70">{p.ruleId}</div>
+          </div>
+        );
+      })}
+    </Popover>
   );
 }
